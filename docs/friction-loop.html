@@ -271,10 +271,10 @@ One note per root cause, at most 3 notes. Write nothing if nothing went wrong. Y
     <div class="scroll"><table>
       <thead><tr><th>Harness</th><th>Reads instructions from</th><th>Files notes with</th><th>Tested</th></tr></thead>
       <tbody>
-        <tr><td>Claude Code</td><td><code>CLAUDE.md</code> importing <code>AGENTS.md</code></td><td>launcher</td><td>Launcher and harness detection run in this project's own sessions.</td></tr>
+        <tr><td>Claude Code</td><td><code>CLAUDE.md</code> importing <code>AGENTS.md</code></td><td>launcher, plus shell-command results from a hook</td><td>Notes and command capture verified in a live <code>claude -p</code> session.</td></tr>
         <tr><td>Codex CLI</td><td><code>AGENTS.md</code></td><td>launcher</td><td>Real sessions in the original experiment. <code>--adapter codex</code> also reads token, cost and command failures from local session files.</td></tr>
-        <tr><td>Cursor</td><td><code>AGENTS.md</code> and an always-applied rule in <code>.cursor/rules/</code></td><td>launcher</td><td>Real sessions in the original experiment.</td></tr>
-        <tr><td>GitHub Copilot (VS Code agent mode, CLI)</td><td><code>.github/copilot-instructions.md</code></td><td>launcher</td><td><strong>Not tested.</strong> It is not auto-detected; set <code>FBL_HARNESS=copilot</code> to label it.</td></tr>
+        <tr><td>Cursor</td><td><code>AGENTS.md</code> and an always-applied rule in <code>.cursor/rules/</code></td><td>launcher, plus command failures from a hook</td><td>Notes: real sessions in the original experiment. <strong>Command hook written to Cursor's documented format, not yet run.</strong></td></tr>
+        <tr><td>GitHub Copilot (CLI, cloud agent)</td><td><code>.github/copilot-instructions.md</code>; Copilot also reads <code>AGENTS.md</code> and <code>CLAUDE.md</code></td><td>launcher, plus success or failure from <code>postToolUse</code> hooks (no exit code)</td><td><strong>Not tested.</strong> Hook config follows the documented format. VS Code agent mode has no documented hooks. Not auto-detected; set <code>FBL_HARNESS=copilot</code>.</td></tr>
         <tr><td>Cloud agents (Copilot coding agent, Codex cloud, Cursor background agents)</td><td>the same files</td><td>commit trailers</td><td>Trailer parsing is tested. The recording workflow ran on GitHub Actions in a private test repo, fed by an agent-style commit I made, not by a real cloud agent.</td></tr>
       </tbody>
     </table></div>
@@ -297,6 +297,19 @@ apm install &lt;owner&gt;/friction-loop --target claude</pre></div>
     <p>APM only copies files, so it cannot install the hooks. After <code>apm install</code>, ask the agent to set the loop up, or run <code>python .claude/skills/friction-loop/install.py --repo .</code> yourself.</p>
   </section>
 
+  <section class="sec" aria-labelledby="capture">
+    <h2 id="capture">Command capture</h2>
+    <p>Notes depend on the agent remembering to write one. Each harness's after-shell-command hook can also send the result to <code>boundary.py command</code>, which stores the command's leading words, its exit code and a kind (tests, lint, build, migrate, install, git, other). The record then shows failed commands and whether the first test run passed, even when no note was filed.</p>
+    <ul>
+      <li>Output is discarded before anything is written. <code>uv run pytest -x tests/secret_name.py</code> is stored as <code>uv run pytest</code>.</li>
+      <li>Only recognised test, lint, build, migrate and install commands keep any words after the executable. <code>mycli login hunter2</code> is stored as <code>mycli</code>. Quoted text is never split open.</li>
+      <li>The hook is silent and always exits 0, so it cannot disturb the agent.</li>
+      <li>The installer writes local configs (<code>.claude/settings.local.json</code>, <code>.cursor/hooks.json</code>, <code>.github/hooks/fbl-commands.json</code>), merges with settings you already have, leaves tracked files alone and excludes all three from git. <code>--no-command-capture</code> skips them.</li>
+    </ul>
+    <h3>What the live test found</h3>
+    <p>In a real Claude Code session a failing <code>sys.exit(2)</code> produced a command event with exit code 2, and the commit's record listed it as a failed command next to the agent's note. Claude Code's real payload differs from its documentation: there is no <code>exit_code</code> field, and a failure arrives as <code>PostToolUseFailure</code> with <code>error: "Exit code N …"</code>. The parser reads that number and nothing else from the error text. Cursor's shell hook documents no exit code, so only failures are recorded unless the payload turns out to carry one. The tool never records a success it cannot see.</p>
+  </section>
+
   <section class="sec" aria-labelledby="hooks">
     <h2 id="hooks">Existing hooks and uninstalling</h2>
     <p>The installer stops rather than overwrite a hook it did not write, and updates its own hooks when you re-run it. If <code>core.hooksPath</code> is set (Husky and similar tools), it refuses, because that folder is tracked and the hooks hold machine-specific paths. Call the tool from your hook manager instead; hook manager support is on the roadmap.</p>
@@ -310,7 +323,7 @@ apm install &lt;owner&gt;/friction-loop --target claude</pre></div>
     <div class="scroll"><table>
       <thead><tr><th>When</th><th>Item</th><th>Why</th></tr></thead>
       <tbody>
-        <tr><td>Next, after the pilot</td><td>Command-failure capture for Claude Code, then Cursor and Copilot as far as their hooks allow</td><td>An objective signal that does not depend on the agent filing a note. Build it if agents miss more than about a third of sessions with failed verification.</td></tr>
+        <tr><td>Next</td><td>Verify command capture in Cursor and Copilot</td><td>The hook configs exist. Run a failing command in each and check the real payloads, since Claude Code's did not match its documentation. Copilot's cloud agent only runs committed hooks, so it needs a variant without machine-specific paths.</td></tr>
         <tr><td>Next</td><td>Under-reporting measure</td><td>Count sessions with failed verification and no note, so the report says how much friction goes unreported.</td></tr>
         <tr><td>Next</td><td>Trend and outcome tracking</td><td>Show whether a fixed doc made its friction notes drop afterwards.</td></tr>
         <tr><td>Later</td><td>Cloud agents validated for real</td><td>Only a simulated agent commit has run. Confirm Copilot's coding agent and Codex cloud follow the trailer instruction, and detect them.</td></tr>
@@ -338,7 +351,7 @@ apm install &lt;owner&gt;/friction-loop --target claude</pre></div>
     <div class="scroll"><table>
       <thead><tr><th>Platform</th><th>State</th></tr></thead>
       <tbody>
-        <tr><td>macOS</td><td>All 129 tests pass. Install, note, commit and record were run end to end through <code>install.sh</code>.</td></tr>
+        <tr><td>macOS</td><td>All 142 tests pass. Install, note, commit and record were run end to end through <code>install.sh</code>.</td></tr>
         <tr><td>Linux</td><td>CI passes on Ubuntu: the test suite and an install smoke test.</td></tr>
         <tr><td>Windows</td><td>CI passes on <code>windows-latest</code>: the same tests plus an install smoke test (install, file a note, commit, record appears). Getting there fixed several test-harness problems; the tool code itself needed no further change. Not tried on a developer's own Windows machine or with PowerShell agents.</td></tr>
       </tbody>
