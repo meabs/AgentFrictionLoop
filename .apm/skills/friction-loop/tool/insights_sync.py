@@ -122,14 +122,21 @@ def _remote_name(repo: Path, requested: str | None) -> str:
 
 
 def _install_hook(repo: Path, name: str, lines: list[str]) -> str:
+    custom = subprocess.run(["git", "config", "--get", "core.hooksPath"], cwd=repo, text=True, capture_output=True).stdout.strip()
+    if custom:
+        raise RuntimeError(f"core.hooksPath is set ({custom}), as Husky and similar tools do; installing there would add machine-specific files to a tracked folder. Call {name} from your hook manager yourself, see README \"Existing hooks\"")
     hooks = Path(subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-path", "hooks"], cwd=repo, text=True, capture_output=True, check=True).stdout.strip())
     hooks.mkdir(parents=True, exist_ok=True)
     body = "#!/bin/sh\n" + "\n".join(lines) + "\n"
     target = hooks / name
     if target.exists():
-        if target.read_text(encoding="utf-8") == body:
+        current = target.read_text(encoding="utf-8")
+        if current == body:
             return f"{name} hook already installed"
-        raise RuntimeError(f"refusing to overwrite existing hook: {target}")
+        if "export FBL_HOME=" not in current:  # not ours
+            raise RuntimeError(f"refusing to overwrite existing hook: {target}")
+        target.write_text(body, encoding="utf-8")
+        return f"updated {name} hook"
     target.write_text(body, encoding="utf-8")
     target.chmod(0o755)
     return f"installed {name} hook"

@@ -44,3 +44,38 @@ def test_unknown_harness_is_rejected(tmp_path: Path):
     path = project(tmp_path)
     result = install(path, tmp_path, "--harness", "vim")
     assert result.returncode != 0 and "unknown --harness" in result.stderr
+
+
+def hooks_dir(path: Path) -> Path:
+    return path / ".git" / "hooks"
+
+
+def test_reinstall_with_new_settings_updates_our_hooks_but_not_foreign_ones(tmp_path: Path):
+    path = project(tmp_path)
+    assert install(path, tmp_path, "--harness", "none").returncode == 0
+    again = subprocess.run([sys.executable, str(INSTALL), "--repo", str(path), "--domain", "other-team", "--home", str(tmp_path / "home"), "--harness", "none"], capture_output=True, text=True)
+    assert again.returncode == 0, again.stderr
+    assert "FBL_DOMAIN='other-team'" in (hooks_dir(path) / "post-commit").read_text()
+    (hooks_dir(path) / "pre-push").write_text("#!/bin/sh\necho mine\n")
+    refused = install(path, tmp_path, "--harness", "none")
+    assert refused.returncode != 0 and "refusing to overwrite" in refused.stderr
+    assert (hooks_dir(path) / "pre-push").read_text() == "#!/bin/sh\necho mine\n"
+
+
+def test_custom_hooks_path_is_refused_before_touching_tracked_files(tmp_path: Path):
+    path = project(tmp_path)
+    subprocess.run(["git", "config", "core.hooksPath", ".husky"], cwd=path, check=True)
+    result = install(path, tmp_path, "--harness", "none")
+    assert result.returncode != 0 and "core.hooksPath" in result.stderr
+    assert not (path / ".husky").exists()
+
+
+def test_uninstall_removes_only_what_it_installed(tmp_path: Path):
+    path = project(tmp_path)
+    assert install(path, tmp_path).returncode == 0
+    (hooks_dir(path) / "pre-push").write_text("#!/bin/sh\necho mine\n")
+    out = subprocess.run([sys.executable, str(INSTALL), "--repo", str(path), "--uninstall"], capture_output=True, text=True)
+    assert out.returncode == 0, out.stderr
+    assert not (hooks_dir(path) / "post-commit").exists() and not (path / ".fbl").exists()
+    assert (hooks_dir(path) / "pre-push").read_text() == "#!/bin/sh\necho mine\n"
+    assert "## Friction reporting" in (path / "AGENTS.md").read_text()

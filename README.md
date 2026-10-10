@@ -1,6 +1,6 @@
 # Agent Friction Loop
 
-Find out where your repository gets in the way of coding agents, and fix the docs that cause it.
+**Version 0.1.0, first release.** Find out where your repository gets in the way of coding agents, and fix the docs that cause it.
 
 Agents (Claude Code, Codex, Cursor, GitHub Copilot) lose time to the same few things: a migration nobody wrote down, a design doc that contradicts the code, a contract they cannot find. This tool makes those moments visible. The agent files a one-line note when something slows it down, a git hook attaches the note to the commit, and a weekly report groups the notes so a person can fix the doc gap that keeps costing time. Nothing edits your repository automatically.
 
@@ -26,14 +26,17 @@ Agents (Claude Code, Codex, Cursor, GitHub Copilot) lose time to the same few th
 - [Privacy](#privacy)
 - [Install as an APM package](#install-as-an-apm-package)
 - [Harnesses](#harnesses)
+- [Existing hooks and uninstalling](#existing-hooks-and-uninstalling)
 - [Platforms](#platforms)
 - [Commands](#commands)
 - [Limits](#limits)
+- [Roadmap](#roadmap)
 - [Repository layout and development](#repository-layout-and-development)
+- [License](#license)
 
 ## Quick start
 
-You need git and Python 3. On Windows, install [Git for Windows](https://gitforwindows.org/), which provides the `sh` that runs git hooks. The installer adds the `jsonschema` package with pip if it is missing.
+You need git and Python 3.10 or newer (CI runs 3.10, 3.12 and 3.13). On Windows, install [Git for Windows](https://gitforwindows.org/), which provides the `sh` that runs git hooks. The installer adds the `jsonschema` package with pip if it is missing.
 
 ```sh
 # macOS / Linux / Git Bash
@@ -96,15 +99,15 @@ Each note has an **origin**: where the problem started, which decides who can fi
 | Copy the tool | Replaces scripts, hooks, schemas and templates; safe to re-run to upgrade | `~/.local/share/fbl` or `%LOCALAPPDATA%\fbl` |
 | Launcher | Writes `fbl-friction` (sh) and `fbl-friction.cmd`; adds `.fbl/` to `.git/info/exclude` | `<project>/.fbl/bin/` |
 | Insights branch | Creates the orphan branch `fbl-insights` as a linked worktree, or adopts the remote one | `.git/fbl/insights` |
-| Hooks | Writes `post-commit` and `pre-push`; stops with an error rather than overwrite a different existing hook | `.git/hooks/` |
+| Hooks | Writes `post-commit` and `pre-push`; updates hooks it wrote earlier, stops rather than overwrite one it did not write, refuses if `core.hooksPath` is set | `.git/hooks/` |
 | Publish (optional) | Commits the shared actor salt and schema, pushes the branch | the remote |
 | Instructions | Appends the friction block to `AGENTS.md`, `.github/copilot-instructions.md` and `.cursor/rules/friction-reporting.mdc`, and adds `@AGENTS.md` to `CLAUDE.md`. Skips any file that already has a `## Friction reporting` heading; everything is left uncommitted | project root |
 
-Options: `--repo` (default `.`), `--harness` (extra instruction files: `claude`, `copilot`, `cursor`, or `none`; default all three), `--domain` (team label stored with each record), `--adapter boundary|codex|boundary,codex|none` (`codex` also reads local Codex session files for token and cost figures), `--home` (tool location), `--publish`, `--no-agents-md`.
+Options: `--uninstall` (see below), `--repo` (default `.`), `--harness` (extra instruction files: `claude`, `copilot`, `cursor`, or `none`; default all three), `--domain` (team label stored with each record), `--adapter boundary|codex|boundary,codex|none` (`codex` also reads local Codex session files for token and cost figures), `--home` (tool location), `--publish`, `--no-agents-md`.
 
 Hooks run in the background and never block a commit or push. Failures are logged to `var/hook.log` inside the tool folder. If the network is down, records stay committed locally and go out with the next push.
 
-Re-running the installer with the same `--domain` is safe. A different `--domain` on a repo that already has the hooks stops with "refusing to overwrite existing hook": delete the two hooks first.
+Re-running the installer is safe: it updates the tool copy and its own hooks, and leaves hooks it did not write alone.
 
 ## Sample output
 
@@ -210,7 +213,7 @@ What you still need to do:
 
 Copy `fbl-weekly.yml` from `.apm/skills/friction-loop/tool/templates/` (also installed to the tool folder) to `.github/workflows/` in your project and set the repository variables `FBL_TOOL_REPOSITORY` (where this tool is hosted, e.g. `meabs/AgentFrictionLoop`) and `FBL_TOOL_REF` (a tag or branch). It runs `weekly.py`, which builds the report with `review.py` and opens an issue with `gh issue create` only when the recommended set has changed.
 
-A finding becomes a recommendation only when enough records and more than one person back it. Smaller ones are labelled "Not established", so one agent's bad day does not become advice.
+Set the repository variable `FBL_ISSUE_NOTES` to `true` to add the agents' note text to the issue body (the report on the branch never contains note text). A finding becomes a recommendation only when enough records and more than one person back it. Smaller ones are labelled "Not established", so one agent's bad day does not become advice.
 
 ## Privacy
 
@@ -236,13 +239,13 @@ The note path does not depend on a particular agent: it is a command line call p
 | Codex CLI | `AGENTS.md` | launcher | yes (`CODEX_THREAD_ID`, `CODEX_SESSION_ID`, `CODEX_CI`) | token, cost and command failures from local session files with `--adapter codex` | real sessions in the original experiment |
 | Cursor | `AGENTS.md` and `.cursor/rules/friction-reporting.mdc` (always applied) | launcher | yes (`CURSOR_AGENT`, `CURSOR_CONVERSATION_ID`) | none yet | real sessions in the original experiment |
 | GitHub Copilot (VS Code agent mode, CLI) | `.github/copilot-instructions.md` | launcher | no; set `FBL_HARNESS=copilot` to label it | none | **not tested**; instruction path is the documented Copilot location, not exercised here |
-| Cloud agents (Copilot coding agent, Codex cloud, Cursor background agents) | whichever file the product reads, same as above | commit trailers, no launcher | no (recorded as `unknown`) | none | trailer parsing is tested; `fbl-record.yml` ran on GitHub Actions in a private test repo, fed by an agent-style commit I made, not by a real Copilot or Codex cloud run |
+| Cloud agents, experimental (Copilot coding agent, Codex cloud, Cursor background agents) | whichever file the product reads, same as above | commit trailers, no launcher | no (recorded as `unknown`) | none | trailer parsing is tested; `fbl-record.yml` ran on GitHub Actions in a private test repo, fed by an agent-style commit I made, not by a real Copilot or Codex cloud run |
 
 Detection only labels the record; a harness that is not detected is recorded as `unknown` and everything else still works.
 
-### Cloud agents and CI
+### Cloud agents and CI (experimental)
 
-Agents that run on a remote machine have no hooks and no `.fbl/` launcher, because both live in your local `.git`. The block tells them to add `Friction[<origin>]: text` trailers to their commit messages instead:
+This path is experimental and not part of what 0.1.0 promises. Agents that run on a remote machine have no hooks and no `.fbl/` launcher, because both live in your local `.git`. The block tells them to add `Friction[<origin>]: text` trailers to their commit messages instead:
 
 ```
 Fix payment retry
@@ -256,6 +259,20 @@ Copy `templates/fbl-record.yml` (installed to the tool folder) to `.github/workf
 ### Verified on GitHub Actions
 
 In a private test repo, a commit with three `Friction[...]` trailers pushed to `main` produced a record on the remote `fbl-insights` branch with all three notes and their origins. The weekly workflow then ran by manual dispatch, wrote `reports/<date>.md` to the branch, and `gh issue create` opened an issue.
+
+## Existing hooks and uninstalling
+
+The installer writes `post-commit` and `pre-push` into the repository's hooks folder and stops rather than overwrite a hook it did not write. Re-running it with different settings updates its own hooks.
+
+If `core.hooksPath` is set (Husky and similar tools do this), the installer refuses, because the hooks folder is tracked and the hooks contain machine-specific paths. Call the tool from your hook manager instead. Each hook is a small script that needs `FBL_HOME` (the tool folder), `FBL_INSIGHTS` (the insights worktree, `<repo>/.git/fbl/insights`), `FBL_DOMAIN`, `FBL_ADAPTER` and `FBL_PYTHON` in its environment; copy the exports from a hook the installer wrote in another clone. Husky-style chaining is on the roadmap.
+
+To remove the loop from a repository:
+
+```sh
+python install.py --repo ~/code/my-project --uninstall
+```
+
+This removes the hooks it installed, `.fbl/` and the insights worktree. It keeps the `fbl-insights` branch (your history of records) and the friction block in `AGENTS.md` and the other instruction files, which you delete by hand. The shared tool folder stays for other repositories.
 
 ## Platforms
 
@@ -287,9 +304,31 @@ Windows differences: file locking uses `msvcrt` instead of `fcntl`; git runs wit
 - Cloud-hosted agents have no launcher or hooks. They rely on commit trailers and the `fbl-record.yml` workflow. That workflow has only been exercised with a simulated agent commit, not a real cloud agent.
 - Notes are self-reported. Treat them as leads unless a command failure or transcript signal agrees.
 - Five origins split a small sample thin; with few records most findings stay "Not established".
-- The check that keeps note text out of the report is a substring match, so a very short note (for example `x`) can make `review.py` fail with "report contains friction sample text".
-- The weekly issue lists findings by id and counts only (`F-001: 1 distinct actors across 2 attributed records…`), without saying what each finding is. The report on the `fbl-insights` branch has the detail.
 - Copilot has not been tested at all, and Claude Code and Cursor give no command-failure signal, only notes.
+
+## Roadmap
+
+Not in 0.1.0, roughly in the order I would do them.
+
+**Next, decided by the first pilot**
+- **Command-failure capture for Claude Code.** A hook after each shell command logs the command's first words, exit code and kind (tests, lint, build, migrate), never output. It gives an objective signal that does not depend on the agent filing a note. Build it if agents miss more than about a third of the sessions that had failed verification. Cursor and Copilot after that, as far as their hooks allow.
+- **Under-reporting measure.** Count sessions with failed verification and no note, so the report says how much friction goes unreported.
+- **Trend and outcome tracking.** The review already has a ledger of recommendations. Wire it up so a fixed doc shows whether its friction notes dropped afterwards.
+
+**Later**
+- **Cloud agents validated for real.** Run the commit-trailer path with a real Copilot coding agent and Codex cloud, confirm they follow the instruction, and detect them as harnesses. Today only a simulated agent commit has been run.
+- **GitHub Copilot tested** in VS Code agent mode and the CLI, with a harness label detected automatically.
+- **Hook manager support** (Husky, lefthook, pre-commit) instead of refusing when `core.hooksPath` is set.
+- **Reusable GitHub Action** (`uses: meabs/AgentFrictionLoop@v1`) instead of copying two workflow files and checking out the tool.
+- **Installable package** (`pipx install`) so there is no folder to copy and upgrades are one command.
+- **`conflicting-knowledge` from the diff.** Flag a commit that changes code a document describes without touching the document, rather than relying on the agent to notice a contradiction.
+- **Task-context notes.** Brief quality lives in issue and prompt templates, outside the repository. Read it from the linked issue so these notes can be cross-checked.
+
+**Ideas**
+- Aggregate several repositories into one review.
+- A privacy mode that stores note categories but no note text.
+- Optional narration of the report by a model, kept behind the existing check that no sample text leaks.
+- Per-person view of your own records (`review.py mine` exists; make it friendlier).
 
 ## Repository layout and development
 
@@ -311,3 +350,7 @@ uv run --with pytest --with jsonschema pytest -q      # or: pip install pytest j
 ```
 
 Extracted from an experiment on agent-ready repositories; the full build history lives in the original `agent-feedback-loop` project.
+
+## License
+
+[MIT](LICENSE).

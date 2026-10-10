@@ -35,6 +35,27 @@ def run(*cmd: str, **kw) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, text=True, **kw)
 
 
+def uninstall(repo: Path) -> int:
+    """Undo the per-repository parts of the install. Only hooks this tool wrote are removed."""
+    hooks = Path(run("git", "-C", str(repo), "rev-parse", "--path-format=absolute", "--git-path", "hooks", capture_output=True).stdout.strip())
+    for name in ("post-commit", "pre-push"):
+        hook = hooks / name
+        if hook.exists() and "export FBL_HOME=" in hook.read_text(encoding="utf-8"):
+            hook.unlink()
+            print(f"removed {name} hook")
+        elif hook.exists():
+            print(f"left {name} hook alone: not installed by this tool")
+    worktree = Path(run("git", "-C", str(repo), "rev-parse", "--path-format=absolute", "--git-common-dir", capture_output=True).stdout.strip()) / "fbl" / "insights"
+    if worktree.exists():
+        run("git", "-C", str(repo), "worktree", "remove", "--force", str(worktree), capture_output=True)
+        print("removed the insights worktree (the fbl-insights branch is kept)")
+    if (repo / ".fbl").exists():
+        shutil.rmtree(repo / ".fbl")
+        print("removed .fbl/")
+    print("kept: the fbl-insights branch, the friction block in AGENTS.md and the other instruction files (delete by hand)")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--repo", default=".")
@@ -43,6 +64,7 @@ def main() -> int:
     ap.add_argument("--home", type=Path, default=None)
     ap.add_argument("--publish", action="store_true", help="push the insights branch to the remote")
     ap.add_argument("--no-agents-md", action="store_true")
+    ap.add_argument("--uninstall", action="store_true", help="remove this repository's hooks, launcher and insights worktree (keeps the fbl-insights branch and the instruction files)")
     ap.add_argument("--harness", default="claude,copilot,cursor", help="extra instruction files to write besides AGENTS.md (Codex reads AGENTS.md): any of claude, copilot, cursor, or none")
     args = ap.parse_args()
 
@@ -56,6 +78,9 @@ def main() -> int:
     if top.returncode:
         sys.exit(f"not a git repository: {args.repo}")
     repo = Path(top.stdout.strip()).resolve()
+
+    if args.uninstall:
+        return uninstall(repo)
 
     try:
         import jsonschema  # noqa: F401

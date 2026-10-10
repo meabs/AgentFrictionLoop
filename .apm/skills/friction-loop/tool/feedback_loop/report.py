@@ -91,7 +91,7 @@ def render_report(facts: dict[str, Any]) -> str:
     if concentrated:
         lines.append("Not recommended (concentrated in few people):")
         for f in concentrated:
-            lines.append(f"- {_text(f['id'])}: {_text(f.get('distinct_actors', 0))} distinct actors across {_text(f.get('attributed_records', 0))} attributed records; largest share {_percent(f.get('largest_actor_share', 0))}%." )
+            lines.append(f"- {_text(f['id'])}: {_text(f['observation'])} Concentrated: {_text(f.get('distinct_actors', 0))} distinct actors across {_text(f.get('attributed_records', 0))} attributed records; largest share {_percent(f.get('largest_actor_share', 0))}%." )
     lines.extend(["", SECTIONS[8], ""])
     ledger = facts.get("ledger", [])
     if ledger:
@@ -102,6 +102,9 @@ def render_report(facts: dict[str, Any]) -> str:
     else:
         lines.append("No recommendation outcomes recorded.")
     return "\n".join(lines) + "\n"
+
+
+MIN_LEAK_SAMPLE = 12
 
 
 def validate_report(markdown: str, facts: dict[str, Any]) -> None:
@@ -115,7 +118,8 @@ def validate_report(markdown: str, facts: dict[str, Any]) -> None:
             raise ValueError("report contains actor id")
     for finding in facts.get("findings", []):
         for sample in finding.get("friction_samples", []):
-            if sample and sample in markdown:
+            # Very short notes ("x", "ok") match ordinary words, so only longer text counts as a leak.
+            if len(sample) >= MIN_LEAK_SAMPLE and sample in markdown:
                 raise ValueError("report contains friction sample text")
     for identifier in re.findall(r"\bF-\d{3}\b", markdown):
         if identifier not in known_findings:

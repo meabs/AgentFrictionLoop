@@ -26,7 +26,7 @@ jobs:
         run: |
           git -C ../../../../../insights config user.name "fbl-review"
           git -C ../../../../../insights config user.email "fbl-review@users.noreply.github.com"
-          python weekly.py --insights ../../../../../insights --push | tee out.txt
+          python weekly.py --insights ../../../../../insights --push ${{ vars.FBL_ISSUE_NOTES == 'true' && '--include-notes' || '' }} | tee out.txt
           echo "issue_body=$(sed -n 's/^issue_body=//p' out.txt)" >> "$GITHUB_OUTPUT"
       - if: steps.review.outputs.issue_body != ''
         env: { GH_TOKEN: "${{ github.token }}" }

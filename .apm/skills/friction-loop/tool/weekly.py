@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import json
 import re
 import sys
 from pathlib import Path
@@ -23,7 +24,20 @@ def has_recommendations(section: str) -> bool:
     return any(line.startswith("- F-") for line in section.splitlines())
 
 
-def run(insights: Path, push: bool, remote: str, today: str | None = None) -> dict:
+def agent_notes(facts_path: Path) -> str:
+    """Sanitised note text per finding, for the issue only. The report itself never carries note text."""
+    try:
+        findings = json.loads(facts_path.read_text(encoding="utf-8")).get("findings", [])
+    except (OSError, json.JSONDecodeError):
+        return ""
+    lines = []
+    for finding in findings:
+        for sample in finding.get("friction_samples", []):
+            lines.append(f"- {finding['id']}: {sample}")
+    return "\n".join(lines)
+
+
+def run(insights: Path, push: bool, remote: str, today: str | None = None, include_notes: bool = False) -> dict:
     today = today or dt.date.today().isoformat()
     report = insights / "reports" / f"{today}.md"
     if review.main(["--insights", str(insights), "--out", str(report), "report"]):
@@ -38,7 +52,8 @@ def run(insights: Path, push: bool, remote: str, today: str | None = None) -> di
             f"Weekly agent-feedback review for {today}.\n\n"
             "These are leads from agent friction notes and session metrics, not proof. "
             f"Full report and evidence records are on the `{insights_sync.BRANCH}` branch: `reports/{today}.md`.\n\n"
-            f"## Recommended improvements\n\n{section}\n",
+            f"## Recommended improvements\n\n{section}\n"
+            + (f"\n## Agent notes\n\nWhat agents wrote, as filed (secrets are filtered at write time):\n\n{notes}\n" if include_notes and (notes := agent_notes(report.with_name(report.stem + ".facts.json"))) else ""),
             encoding="utf-8",
         )
         marker.write_text(digest + "\n", encoding="utf-8")
@@ -57,8 +72,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--insights", required=True)
     parser.add_argument("--push", action="store_true")
     parser.add_argument("--remote", default="origin")
+    parser.add_argument("--include-notes", action="store_true", help="add the agents' note text to the issue body (the report never contains it)")
     args = parser.parse_args(argv)
-    result = run(Path(args.insights).resolve(), args.push, args.remote)
+    result = run(Path(args.insights).resolve(), args.push, args.remote, include_notes=args.include_notes)
     print(f"report={result['report']}")
     print(f"issue_body={result['issue_body'] or ''}")
     print(f"push={result['push']}")
