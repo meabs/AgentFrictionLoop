@@ -123,6 +123,7 @@ footer { color: var(--muted); font-size: 0.85rem; }
         <tr><td><code>--adapter</code></td><td><code>boundary</code> (default), <code>codex</code> to also read local Codex sessions for token cost, or <code>none</code>.</td></tr>
         <tr><td><code>--home</code></td><td>Where the tool is copied.</td></tr>
         <tr><td><code>--publish</code></td><td>Push the insights branch to the remote.</td></tr>
+        <tr><td><code>--harness</code></td><td>Extra instruction files besides <code>AGENTS.md</code>: <code>claude</code>, <code>copilot</code>, <code>cursor</code> (all by default) or <code>none</code>.</td></tr>
         <tr><td><code>--no-agents-md</code></td><td>Do not touch <code>AGENTS.md</code>.</td></tr>
       </tbody>
     </table>
@@ -141,7 +142,7 @@ footer { color: var(--muted); font-size: 0.85rem; }
         <tr><td>4. Insights branch</td><td>Creates the orphan branch <code>fbl-insights</code> as a linked worktree, or adopts the one already on the remote.</td><td><code>.git/fbl/insights</code></td></tr>
         <tr><td>5. Hooks</td><td>Writes <code>post-commit</code> and <code>pre-push</code>. Each exports the tool path and Python path and runs the tool in the background. An existing hook with different content stops the install with an error.</td><td><code>.git/hooks/</code></td></tr>
         <tr><td>6. Publish (optional)</td><td>With <code>--publish</code>, commits the shared actor salt and schema and pushes the branch.</td><td>the remote</td></tr>
-        <tr><td>7. AGENTS.md</td><td>Appends the friction block if there is no <code>## Friction reporting</code> heading yet. Left uncommitted for you to review.</td><td><code>AGENTS.md</code></td></tr>
+        <tr><td>7. Instructions</td><td>Appends the friction block to <code>AGENTS.md</code>, <code>.github/copilot-instructions.md</code> and <code>.cursor/rules/friction-reporting.mdc</code>, and adds <code>@AGENTS.md</code> to <code>CLAUDE.md</code>. Files that already have a <code>## Friction reporting</code> heading are skipped. Nothing is committed.</td><td>project root</td></tr>
       </tbody>
     </table></div>
     <p>Hooks and the launcher live in <code>.git</code> and <code>.fbl</code>, which git does not share. <strong>Every clone needs its own install</strong>, including each teammate's.</p>
@@ -219,7 +220,7 @@ Not established (below threshold):
 
   <section class="sec" aria-labelledby="agents">
     <h2 id="agents">What to configure in AGENTS.md</h2>
-    <p>The file is <code>AGENTS.md</code> at the repository root. The installer adds the block below; this section covers what you still have to check.</p>
+    <p>The file is <code>AGENTS.md</code> at the repository root. The installer adds the block below to <code>AGENTS.md</code> and the other instruction files; this section covers what you still have to check.</p>
 <div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>## Friction reporting
 
 If something blocked or slowed you down, report it before finishing, even if you worked around it:
@@ -235,15 +236,19 @@ Pick the origin by asking "where did the problem start?":
 - verification: you could not tell whether your change was correct (no fast test, flaky or missing fixtures).
 - conflicting-knowledge: two sources disagreed, or a doc contradicted the code. Say which one you trusted.
 
+If `./.fbl/bin/fbl-friction` does not exist (cloud agents and CI have no launcher), add trailer lines to your commit message instead, one per note:
+
+Friction[&lt;origin>]: &lt;what happened and what fixed it, one line, no secrets>
+
 For a machine fault no doc could prevent (disk full, no network, permissions) use `--category environment` instead of `--origin`.
 
-One note per root cause, at most 3 notes. Write nothing if nothing went wrong.</pre></div>
+One note per root cause, at most 3 notes. Write nothing if nothing went wrong. You may instead add a commit trailer: `Friction[category]: text`.</pre></div>
     <div class="scroll"><table>
       <thead><tr><th>Check</th><th>Why it matters</th></tr></thead>
       <tbody>
         <tr><td>Commit the block</td><td>The installer leaves <code>AGENTS.md</code> modified but uncommitted. Teammates' agents only see it once it is merged.</td></tr>
         <tr><td>Keep the launcher path as written</td><td>Agents run <code>./.fbl/bin/fbl-friction</code> from the repository root. If a clone has not run the installer, the command is not found and the agent gets an error, so tell new contributors to run it.</td></tr>
-        <tr><td>Claude Code reads <code>CLAUDE.md</code>, not <code>AGENTS.md</code></td><td>Add a line <code>@AGENTS.md</code> to <code>CLAUDE.md</code> so the block reaches Claude Code. Codex and Cursor read <code>AGENTS.md</code> directly.</td></tr>
+        <tr><td>Check <code>CLAUDE.md</code></td><td>Claude Code reads <code>CLAUDE.md</code>, not <code>AGENTS.md</code>. The installer adds an <code>@AGENTS.md</code> import line, and creates the file if it is missing.</td></tr>
         <tr><td>Keep the five origins</td><td>The report groups by them. An unknown <code>--origin</code> is rejected; giving neither <code>--origin</code> nor <code>--category</code> is an error. Blocks installed before origins existed keep working, with notes grouped by category.</td></tr>
         <tr><td>Tell agents which source they trusted</td><td>A <code>conflicting-knowledge</code> note is only useful if it names both sources and the winner. Agents are poor at spotting a contradiction on their own, so expect fewer of these than the real number.</td></tr>
         <tr><td>Reference your docs from AGENTS.md</td><td>The report compares the paths <code>AGENTS.md</code> links to against the files agents actually opened. A link that agents never open, or a doc they open that nothing links to, shows up as a finding.</td></tr>
@@ -257,6 +262,29 @@ One note per root cause, at most 3 notes. Write nothing if nothing went wrong.</
       <li>Run <code>--publish</code> once per project, not per clone, so everyone shares one actor salt.</li>
       <li>Optional: <code>--adapter codex</code> adds token and cost figures from local Codex session files.</li>
     </ul>
+  </section>
+
+  <section class="sec" aria-labelledby="harness">
+    <h2 id="harness">Works with</h2>
+    <p>The note path does not depend on one agent. It is a command plus an instruction file, so any agent that reads repo instructions and can run a shell command can use it. The installer writes the instructions where each tool looks.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Harness</th><th>Reads instructions from</th><th>Files notes with</th><th>Tested</th></tr></thead>
+      <tbody>
+        <tr><td>Claude Code</td><td><code>CLAUDE.md</code> importing <code>AGENTS.md</code></td><td>launcher</td><td>Launcher and harness detection run in this project's own sessions.</td></tr>
+        <tr><td>Codex CLI</td><td><code>AGENTS.md</code></td><td>launcher</td><td>Real sessions in the original experiment. <code>--adapter codex</code> also reads token, cost and command failures from local session files.</td></tr>
+        <tr><td>Cursor</td><td><code>AGENTS.md</code> and an always-applied rule in <code>.cursor/rules/</code></td><td>launcher</td><td>Real sessions in the original experiment.</td></tr>
+        <tr><td>GitHub Copilot (VS Code agent mode, CLI)</td><td><code>.github/copilot-instructions.md</code></td><td>launcher</td><td><strong>Not tested.</strong> It is not auto-detected; set <code>FBL_HARNESS=copilot</code> to label it.</td></tr>
+        <tr><td>Cloud agents (Copilot coding agent, Codex cloud, Cursor background agents)</td><td>the same files</td><td>commit trailers</td><td>Trailer parsing is tested, and the recording workflow ran locally. It has not run on GitHub Actions.</td></tr>
+      </tbody>
+    </table></div>
+    <p>Detection only labels the record. An undetected harness is recorded as <code>unknown</code> and everything else still works.</p>
+    <h3>Cloud agents and CI</h3>
+    <p>An agent on a remote machine has no hooks and no <code>.fbl/</code> launcher, because both live in your local <code>.git</code>. The AGENTS.md block tells it to put trailers in its commit messages instead:</p>
+<div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>Fix payment retry
+
+Friction[repository-discovery]: could not find the payments contract
+Friction[verification]: no single-test command documented</pre></div>
+    <p>Copy <code>templates/fbl-record.yml</code> to <code>.github/workflows/</code> and set <code>FBL_TOOL_REPOSITORY</code>, <code>FBL_TOOL_REF</code> and <code>FBL_DOMAIN</code>. On every push to <code>main</code> it records each new commit, trailers included, on the <code>fbl-insights</code> branch. A record a developer's machine already made is kept as it is.</p>
   </section>
 
   <section class="sec" aria-labelledby="apm">
@@ -282,7 +310,7 @@ apm install &lt;owner&gt;/friction-loop --target claude</pre></div>
     <div class="scroll"><table>
       <thead><tr><th>Platform</th><th>State</th></tr></thead>
       <tbody>
-        <tr><td>macOS</td><td>All 117 tests pass. Install, note, commit and record were run end to end through <code>install.sh</code>.</td></tr>
+        <tr><td>macOS</td><td>All 122 tests pass. Install, note, commit and record were run end to end through <code>install.sh</code>.</td></tr>
         <tr><td>Linux</td><td>CI passes on Ubuntu: the test suite and an install smoke test.</td></tr>
         <tr><td>Windows</td><td>CI passes on <code>windows-latest</code>: the same tests plus an install smoke test (install, file a note, commit, record appears). Getting there fixed several test-harness problems; the tool code itself needed no further change. Not tried on a developer's own Windows machine or with PowerShell agents.</td></tr>
       </tbody>
