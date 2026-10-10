@@ -4,7 +4,7 @@
 
 Agents (Claude Code, Codex, Cursor, GitHub Copilot) lose time to the same few things: a migration nobody wrote down, a design doc that contradicts the code, a contract they cannot find. This tool makes those moments visible. The agent files a one-line note when something slows it down, a git hook attaches the note to the commit, and a weekly report groups the notes so a person can fix the doc gap that keeps costing time. Nothing edits your repository automatically.
 
-[Interactive explainer](docs/friction-loop.html) (download and open locally; it has an Export as HTML button when viewed as a Claude artifact)
+[Interactive explainer](https://meabs.github.io/AgentFrictionLoop/): how the loop works, sample outputs and the AGENTS.md block.
 
 ```
  agent                       git hooks                       GitHub Action            you
