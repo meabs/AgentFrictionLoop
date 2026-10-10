@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from . import secrets
-from .origins import valid as valid_origin
+from .origins import DEFAULT_CATEGORY, valid as valid_origin
 
 IDLE_GAP_SECONDS = 30 * 60
 COMMIT_FUZZ_SECONDS = 5
@@ -103,7 +103,11 @@ def _trailers(repo: Path, commit: str) -> list[dict[str, str]]:
     for line in _git(repo, "show", "-s", "--format=%B", commit).splitlines():
         match = re.match(r"^Friction(?:\[([^]]+)\])?:\s*(.*)$", line.strip(), re.I)
         if match:
-            result.append(_friction_item(match.group(1) or "other", match.group(2), "trailer"))
+            label = match.group(1) or "other"
+            if valid_origin(label):  # Friction[conflicting-knowledge]: ... works like --origin
+                result.append(_friction_item(DEFAULT_CATEGORY[label], match.group(2), "trailer", label))
+            else:
+                result.append(_friction_item(label, match.group(2), "trailer"))
     return [item for item in result if item]
 
 
@@ -150,23 +154,37 @@ def _verification_kind(kind: Any) -> str | None:
     return kind if kind in {"tests", "lint", "build", "migration"} else None
 
 
+def _with_trailers(record: dict[str, Any], repo_path: Path) -> dict[str, Any]:
+    """Friction trailers live in the commit itself, so they need no local event log (cloud agents, CI)."""
+    notes = list(record.get("friction", [])) + _trailers(repo_path, record.get("commit", "HEAD"))
+    unique, seen = [], set()
+    for item in notes:
+        key = (item["category"], item.get("origin"), item["text"])
+        if key not in seen:
+            seen.add(key)
+            unique.append(item)
+    if unique:
+        record["friction"] = unique[:20]
+    return record
+
+
 def enrich_record(record: dict[str, Any], repo: str | Path, insights: str | Path, session: str | None = None) -> dict[str, Any]:
     del insights  # adapter parity with the Codex adapter; boundary data lives beside git.
     repo_path = Path(repo).resolve()
     events = _read_events(repo_path)
     commit_time = _time(record.get("timestamp"))
     if not events or not commit_time:
-        return record
+        return _with_trailers(record, repo_path)
     selected = _session_for(events, commit_time, session)
     if not selected:
-        return record
+        return _with_trailers(record, repo_path)
     identifier, values = selected
     previous = _previous_timestamp(repo_path, record)
     bounded = list(values)
     if identifier.startswith("gap-") and previous:
         bounded = [event for event in bounded if (_time(event["ts"]) or commit_time) > previous]
     if not bounded:
-        return record
+        return _with_trailers(record, repo_path)
     top_level = [event for event in bounded if event.get("parent_event_id") is None]
     command_events = [event for event in top_level if event.get("type") == "command"]
     failed = [event for event in command_events if isinstance(event.get("exit_code"), int) and event["exit_code"] != 0]

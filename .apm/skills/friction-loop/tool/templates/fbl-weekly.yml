@@ -22,11 +22,11 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install jsonschema
       - id: review
-        working-directory: tool
+        working-directory: tool/.apm/skills/friction-loop/tool
         run: |
-          git -C ../insights config user.name "fbl-review"
-          git -C ../insights config user.email "fbl-review@users.noreply.github.com"
-          python weekly.py --insights ../insights --push | tee out.txt
+          git -C ../../../../../insights config user.name "fbl-review"
+          git -C ../../../../../insights config user.email "fbl-review@users.noreply.github.com"
+          python weekly.py --insights ../../../../../insights --push | tee out.txt
           echo "issue_body=$(sed -n 's/^issue_body=//p' out.txt)" >> "$GITHUB_OUTPUT"
       - if: steps.review.outputs.issue_body != ''
         env: { GH_TOKEN: "${{ github.token }}" }

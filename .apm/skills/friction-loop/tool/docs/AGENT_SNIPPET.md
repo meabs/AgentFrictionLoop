@@ -18,6 +18,10 @@ Pick the origin by asking "where did the problem start?":
 - verification: you could not tell whether your change was correct (no fast test, flaky or missing fixtures).
 - conflicting-knowledge: two sources disagreed, or a doc contradicted the code. Say which one you trusted.
 
+If `./.fbl/bin/fbl-friction` does not exist (cloud agents and CI have no launcher), add trailer lines to your commit message instead, one per note:
+
+Friction[<origin>]: <what happened and what fixed it, one line, no secrets>
+
 For a machine fault no doc could prevent (disk full, no network, permissions) use `--category environment` instead of `--origin`.
 
 One note per root cause, at most 3 notes. Write nothing if nothing went wrong. You may instead add a commit trailer: `Friction[category]: text`.

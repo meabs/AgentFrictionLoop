@@ -43,8 +43,13 @@ def main() -> int:
     ap.add_argument("--home", type=Path, default=None)
     ap.add_argument("--publish", action="store_true", help="push the insights branch to the remote")
     ap.add_argument("--no-agents-md", action="store_true")
+    ap.add_argument("--harness", default="claude,copilot,cursor", help="extra instruction files to write besides AGENTS.md (Codex reads AGENTS.md): any of claude, copilot, cursor, or none")
     args = ap.parse_args()
 
+    wanted = {h.strip() for h in args.harness.split(",") if h.strip()} - {"none"}
+    unknown = wanted - {"claude", "copilot", "cursor"}
+    if unknown:
+        sys.exit("unknown --harness: " + ", ".join(sorted(unknown)))
     if not shutil.which("git"):
         sys.exit("git is required")
     top = run("git", "-C", args.repo, "rev-parse", "--show-toplevel", capture_output=True)
@@ -85,18 +90,36 @@ def main() -> int:
         if run(*step).returncode:
             sys.exit(1)
 
-    if not args.no_agents_md:
-        agents = repo / "AGENTS.md"
-        existing = agents.read_text(encoding="utf-8") if agents.exists() else ""
+    snippet = (home / "docs/AGENT_SNIPPET.md").read_text(encoding="utf-8")
+    block = re.search(r"```text\n(.*?)```", snippet, re.S).group(1)
+    written = []
+
+    def append_block(path: Path, text: str, prefix: str = "") -> None:
+        existing = path.read_text(encoding="utf-8") if path.exists() else ""
         if re.search(r"^## Friction reporting", existing, re.M):
-            print("AGENTS.md already has the friction block")
-        else:
-            snippet = (home / "docs/AGENT_SNIPPET.md").read_text(encoding="utf-8")
-            block = re.search(r"```text\n(.*?)```", snippet, re.S).group(1)
-            with agents.open("a", encoding="utf-8", newline="\n") as stream:
-                stream.write(("\n" if existing.strip() else "") + block)
-            print(f"added friction block to {agents} (review and commit it)")
-    print(f"done. Weekly review: copy {home / 'templates/fbl-weekly.yml'} to {repo / '.github/workflows'} and set FBL_TOOL_REPOSITORY / FBL_TOOL_REF.")
+            print(f"{path.relative_to(repo)} already has the friction block")
+            return
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8", newline="\n") as stream:
+            stream.write(("\n" if existing.strip() else "") + (prefix if not existing else "") + text)
+        written.append(str(path.relative_to(repo)))
+
+    if not args.no_agents_md:
+        append_block(repo / "AGENTS.md", block)
+    if "claude" in wanted:  # Claude Code reads CLAUDE.md, not AGENTS.md; import it
+        claude = repo / "CLAUDE.md"
+        existing = claude.read_text(encoding="utf-8") if claude.exists() else ""
+        if "@AGENTS.md" not in existing:
+            with claude.open("a", encoding="utf-8", newline="\n") as stream:
+                stream.write(("\n" if existing.strip() and not existing.endswith("\n") else "") + "@AGENTS.md\n")
+            written.append("CLAUDE.md")
+    if "copilot" in wanted:
+        append_block(repo / ".github" / "copilot-instructions.md", block)
+    if "cursor" in wanted:
+        append_block(repo / ".cursor" / "rules" / "friction-reporting.mdc", block, "---\ndescription: Report friction notes before finishing a task\nalwaysApply: true\n---\n\n")
+    if written:
+        print("wrote the friction instructions to: " + ", ".join(written) + " (review and commit)")
+    print(f"done. For cloud agents copy {home / 'templates/fbl-record.yml'} and for the weekly report {home / 'templates/fbl-weekly.yml'} to {repo / '.github/workflows'}, then set FBL_TOOL_REPOSITORY, FBL_TOOL_REF and FBL_DOMAIN.")
     return 0
 
 

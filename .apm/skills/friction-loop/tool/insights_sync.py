@@ -60,6 +60,19 @@ def init(repo: Path, remote: str = "origin") -> Path:
         result = git(repo, "worktree", "add", "--quiet", "-B", BRANCH, str(wt), remote_ref)
     elif _has_ref(repo, f"refs/heads/{BRANCH}"):
         result = git(repo, "worktree", "add", "--quiet", str(wt), BRANCH)
+    elif not _has_ref(repo, "HEAD"):
+        # A repository with no commits yet cannot host a detached worktree; build the root commit by hand.
+        tree = subprocess.run(["git", "mktree"], cwd=repo, input="", text=True, capture_output=True, env=_clean_env()).stdout.strip()
+        identity = {**_clean_env(), "GIT_AUTHOR_NAME": "fbl", "GIT_AUTHOR_EMAIL": "fbl@localhost", "GIT_COMMITTER_NAME": "fbl", "GIT_COMMITTER_EMAIL": "fbl@localhost"}
+        root = subprocess.run(["git", "commit-tree", tree, "-m", "Initialise fbl insights"], cwd=repo, text=True, capture_output=True, env=identity).stdout.strip()
+        if not tree or not root:
+            raise RuntimeError("unable to create the insights root commit")
+        git(repo, "update-ref", f"refs/heads/{BRANCH}", root)
+        result = git(repo, "worktree", "add", "--quiet", str(wt), BRANCH)
+        if not result.returncode:
+            (wt / ".gitignore").write_text(".lock\n", encoding="utf-8")
+            git(wt, "add", ".gitignore")
+            subprocess.run(["git", "-c", "core.hooksPath=" + empty_hooks_dir(), "commit", "--quiet", "-m", "Ignore lock file"], cwd=wt, env=identity, capture_output=True, text=True)
     else:
         result = git(repo, "worktree", "add", "--quiet", "--detach", str(wt))
         if not result.returncode:

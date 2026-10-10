@@ -2,7 +2,7 @@
 
 Find out where your repository gets in the way of coding agents, and fix the docs that cause it.
 
-Agents (Claude Code, Codex, Cursor, Copilot) lose time to the same few things: a migration nobody wrote down, a design doc that contradicts the code, a contract they cannot find. This tool makes those moments visible. The agent files a one-line note when something slows it down, a git hook attaches the note to the commit, and a weekly report groups the notes so a person can fix the doc gap that keeps costing time. Nothing edits your repository automatically.
+Agents (Claude Code, Codex, Cursor, GitHub Copilot) lose time to the same few things: a migration nobody wrote down, a design doc that contradicts the code, a contract they cannot find. This tool makes those moments visible. The agent files a one-line note when something slows it down, a git hook attaches the note to the commit, and a weekly report groups the notes so a person can fix the doc gap that keeps costing time. Nothing edits your repository automatically.
 
 [Interactive explainer](docs/friction-loop.html) (download and open locally; it has an Export as HTML button when viewed as a Claude artifact)
 
@@ -25,6 +25,7 @@ Agents (Claude Code, Codex, Cursor, Copilot) lose time to the same few things: a
 - [The weekly review](#the-weekly-review)
 - [Privacy](#privacy)
 - [Install as an APM package](#install-as-an-apm-package)
+- [Harnesses](#harnesses)
 - [Platforms](#platforms)
 - [Commands](#commands)
 - [Limits](#limits)
@@ -97,9 +98,9 @@ Each note has an **origin**: where the problem started, which decides who can fi
 | Insights branch | Creates the orphan branch `fbl-insights` as a linked worktree, or adopts the remote one | `.git/fbl/insights` |
 | Hooks | Writes `post-commit` and `pre-push`; stops with an error rather than overwrite a different existing hook | `.git/hooks/` |
 | Publish (optional) | Commits the shared actor salt and schema, pushes the branch | the remote |
-| AGENTS.md | Appends the friction block unless a `## Friction reporting` heading exists; left uncommitted | `AGENTS.md` |
+| Instructions | Appends the friction block to `AGENTS.md`, `.github/copilot-instructions.md` and `.cursor/rules/friction-reporting.mdc`, and adds `@AGENTS.md` to `CLAUDE.md`. Skips any file that already has a `## Friction reporting` heading; everything is left uncommitted | project root |
 
-Options: `--repo` (default `.`), `--domain` (team label stored with each record), `--adapter boundary|codex|boundary,codex|none` (`codex` also reads local Codex session files for token and cost figures), `--home` (tool location), `--publish`, `--no-agents-md`.
+Options: `--repo` (default `.`), `--harness` (extra instruction files: `claude`, `copilot`, `cursor`, or `none`; default all three), `--domain` (team label stored with each record), `--adapter boundary|codex|boundary,codex|none` (`codex` also reads local Codex session files for token and cost figures), `--home` (tool location), `--publish`, `--no-agents-md`.
 
 Hooks run in the background and never block a commit or push. Failures are logged to `var/hook.log` inside the tool folder. If the network is down, records stay committed locally and go out with the next push.
 
@@ -187,15 +188,19 @@ Pick the origin by asking "where did the problem start?":
 - verification: you could not tell whether your change was correct (no fast test, flaky or missing fixtures).
 - conflicting-knowledge: two sources disagreed, or a doc contradicted the code. Say which one you trusted.
 
+If `./.fbl/bin/fbl-friction` does not exist (cloud agents and CI have no launcher), add trailer lines to your commit message instead, one per note:
+
+Friction[<origin>]: <what happened and what fixed it, one line, no secrets>
+
 For a machine fault no doc could prevent (disk full, no network, permissions) use `--category environment` instead of `--origin`.
 
-One note per root cause, at most 3 notes. Write nothing if nothing went wrong.
+One note per root cause, at most 3 notes. Write nothing if nothing went wrong. You may instead add a commit trailer: `Friction[category]: text`.
 ```
 
 What you still need to do:
 
 - **Commit the block.** It is left uncommitted; teammates' agents only see it once merged.
-- **Add `@AGENTS.md` to `CLAUDE.md`.** Claude Code reads `CLAUDE.md`, not `AGENTS.md`. Codex and Cursor read `AGENTS.md` directly.
+- **`CLAUDE.md`.** Claude Code reads `CLAUDE.md`, not `AGENTS.md`; the installer adds an `@AGENTS.md` import. Codex and Cursor read `AGENTS.md` directly.
 - **Keep the launcher path as written.** If a clone has not run the installer, the command is not found; tell new contributors to run it.
 - **Reference your docs from `AGENTS.md`.** The report compares the paths it links to against the files agents actually opened.
 - **Expect a new "epoch" when guidance changes.** Edits to `AGENTS.md`, `CLAUDE.md`, `service.yaml` or anything under `.claude/skills/` or `.agents/skills/` change the guidance digest, which before/after comparisons use.
@@ -203,7 +208,7 @@ What you still need to do:
 
 ## The weekly review
 
-Copy `.apm/skills/friction-loop/tool/templates/fbl-weekly.yml` (also installed to the tool folder) to `.github/workflows/` in your project and set the repository variables `FBL_TOOL_REPOSITORY` (where this tool is hosted, e.g. `meabs/AgentFrictionLoop`) and `FBL_TOOL_REF` (a tag or branch). It runs `weekly.py`, which builds the report with `review.py` and opens an issue with `gh issue create` only when the recommended set has changed.
+Copy `fbl-weekly.yml` from `.apm/skills/friction-loop/tool/templates/` (also installed to the tool folder) to `.github/workflows/` in your project and set the repository variables `FBL_TOOL_REPOSITORY` (where this tool is hosted, e.g. `meabs/AgentFrictionLoop`) and `FBL_TOOL_REF` (a tag or branch). It runs `weekly.py`, which builds the report with `review.py` and opens an issue with `gh issue create` only when the recommended set has changed.
 
 A finding becomes a recommendation only when enough records and more than one person back it. Smaller ones are labelled "Not established", so one agent's bad day does not become advice.
 
@@ -220,6 +225,33 @@ apm install meabs/AgentFrictionLoop --target claude     # or: apm install ./fric
 ```
 
 APM only copies files, so it cannot install hooks. After `apm install`, ask the agent to set the loop up, or run `python .claude/skills/friction-loop/install.py --repo .`. The skill lands in `.claude/skills/`, which counts as guidance, so installing it starts a new epoch in before/after comparisons. `--target` is required (APM 0.13 no longer defaults).
+
+## Harnesses
+
+The note path does not depend on a particular agent: it is a command line call plus an instruction file, so any agent that can read repo instructions and run a shell command can use it. The installer writes the instructions where each tool looks (`--harness claude,copilot,cursor`, all by default; `none` writes only `AGENTS.md`).
+
+| Harness | Reads instructions from | Files notes with | Detected as | Extra signal | Tested |
+| --- | --- | --- | --- | --- | --- |
+| Claude Code | `CLAUDE.md` (installer adds `@AGENTS.md`) | `fbl-friction` launcher | yes (`CLAUDECODE`, `CLAUDE_CODE_SESSION_ID`) | none yet | launcher and detection run in this project's own sessions |
+| Codex CLI | `AGENTS.md` | launcher | yes (`CODEX_THREAD_ID`, `CODEX_SESSION_ID`, `CODEX_CI`) | token, cost and command failures from local session files with `--adapter codex` | real sessions in the original experiment |
+| Cursor | `AGENTS.md` and `.cursor/rules/friction-reporting.mdc` (always applied) | launcher | yes (`CURSOR_AGENT`, `CURSOR_CONVERSATION_ID`) | none yet | real sessions in the original experiment |
+| GitHub Copilot (VS Code agent mode, CLI) | `.github/copilot-instructions.md` | launcher | no; set `FBL_HARNESS=copilot` to label it | none | **not tested**; instruction path is the documented Copilot location, not exercised here |
+| Cloud agents (Copilot coding agent, Codex cloud, Cursor background agents) | whichever file the product reads, same as above | commit trailers, no launcher | no (recorded as `unknown`) | none | trailer parsing is tested; the workflow below has been run locally, not on GitHub Actions |
+
+Detection only labels the record; a harness that is not detected is recorded as `unknown` and everything else still works.
+
+### Cloud agents and CI
+
+Agents that run on a remote machine have no hooks and no `.fbl/` launcher, because both live in your local `.git`. The block tells them to add `Friction[<origin>]: text` trailers to their commit messages instead:
+
+```
+Fix payment retry
+
+Friction[repository-discovery]: could not find the payments contract
+Friction[verification]: no single-test command documented
+```
+
+Copy `templates/fbl-record.yml` (installed to the tool folder) to `.github/workflows/` and set the repository variables `FBL_TOOL_REPOSITORY`, `FBL_TOOL_REF` and `FBL_DOMAIN`. On every push to `main` it records each new commit, trailers included, on the `fbl-insights` branch. If a developer's machine already recorded the commit, the existing record is kept. Trailers also work locally and are merged with notes filed through the launcher.
 
 ## Platforms
 
@@ -248,12 +280,12 @@ Windows differences: file locking uses `msvcrt` instead of `fcntl`; git runs wit
 
 ## Limits
 
-- Cloud-hosted agents are not covered: the hooks only run on a developer's machine.
+- Cloud-hosted agents have no launcher or hooks. They rely on commit trailers and the `fbl-record.yml` workflow, which has not run on GitHub yet.
 - Notes are self-reported. Treat them as leads unless a command failure or transcript signal agrees.
 - Five origins split a small sample thin; with few records most findings stay "Not established".
 - The check that keeps note text out of the report is a substring match, so a very short note (for example `x`) can make `review.py` fail with "report contains friction sample text".
 - The weekly workflow and `gh issue create` have not been run on GitHub.
-- Claude Code and Copilot sessions have had less testing than Codex and Cursor.
+- Copilot has not been tested at all, and Claude Code and Cursor give no command-failure signal, only notes.
 
 ## Repository layout and development
 

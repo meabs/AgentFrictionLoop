@@ -74,3 +74,27 @@ def test_review_groups_by_origin_when_present_else_category():
     assert [_friction_key(i) for i in _friction(record)] == ["task-context", "setup"]
     assert len(_friction(record, "task-context")) == 1 and len(_friction(record, "other")) == 0
     assert set(origins.ORIGINS) <= set(FRICTION_PROPOSALS)
+
+
+def test_commit_trailer_accepts_an_origin_or_a_category(tmp_path: Path):
+    from feedback_loop.boundary_adapter import _trailers
+    path = repo(tmp_path)
+    git = lambda *a: subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *a], cwd=path, check=True, capture_output=True)
+    (path / "f").write_text("x")
+    git("add", "f")
+    git("commit", "-m", "work\n\nFriction[conflicting-knowledge]: ADR-4 says sqlite, code uses postgres\nFriction[test-order]: migrate before pytest\nFriction: no label")
+    items = _trailers(path, "HEAD")
+    assert [(i["category"], i.get("origin")) for i in items] == [("unclear-instruction", "conflicting-knowledge"), ("test-order", None), ("other", None)]
+    assert all(i["source"] == "trailer" for i in items)
+
+
+def test_trailers_reach_the_record_without_any_local_event_log(tmp_path: Path):
+    """Cloud agents and CI have no .git/fbl/boundary log; the trailer must still become friction."""
+    from feedback_loop.boundary_adapter import enrich_record
+    path = repo(tmp_path)
+    git = lambda *a: subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *a], cwd=path, check=True, capture_output=True)
+    (path / "f").write_text("x")
+    git("add", "f")
+    git("commit", "-m", "work\n\nFriction[verification]: no single-test command documented")
+    record = enrich_record({"timestamp": "2026-10-10T00:00:00Z", "commit": "HEAD"}, path, tmp_path / "ins")
+    assert record["friction"] == [{"category": "test-order", "text": "no single-test command documented", "source": "trailer", "origin": "verification"}]

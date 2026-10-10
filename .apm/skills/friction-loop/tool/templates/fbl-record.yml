@@ -1,0 +1,45 @@
+# Copy to .github/workflows/fbl-record.yml in the project repository.
+# Records friction for agents that run in the cloud (Copilot coding agent, Codex cloud, Cursor background agents):
+# they have no local hooks or launcher, so they put `Friction[origin]: text` trailers in commit messages and this
+# job turns each pushed commit into a record on the fbl-insights branch.
+# Repository variables: FBL_TOOL_REPOSITORY (e.g. meabs/AgentFrictionLoop), FBL_TOOL_REF (tag or branch),
+# FBL_DOMAIN (the same --domain your developers pass to the installer).
+name: Record agent friction
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+concurrency: fbl-record
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.FBL_TOOL_REPOSITORY }}
+          ref: ${{ vars.FBL_TOOL_REF }}
+          path: .fbl-tool
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install jsonschema
+      - name: Record new commits
+        env:
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          FBL_DOMAIN: ${{ vars.FBL_DOMAIN }}
+        run: |
+          TOOL=.fbl-tool/.apm/skills/friction-loop/tool
+          git config user.name "fbl-record"
+          git config user.email "fbl-record@users.noreply.github.com"
+          git config --global user.name "fbl-record"
+          git config --global user.email "fbl-record@users.noreply.github.com"
+          python $TOOL/insights_sync.py init --repo .
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then RANGE="$AFTER^!"; else RANGE="$BEFORE..$AFTER"; fi
+          for c in $(git rev-list --reverse "$RANGE"); do
+            python $TOOL/analyse-change.py --repo . --commit "$c" --insights .git/fbl/insights \
+              --domain "${FBL_DOMAIN:-default}" --adapter boundary --fail-open
+          done
+          python $TOOL/insights_sync.py push --repo .
