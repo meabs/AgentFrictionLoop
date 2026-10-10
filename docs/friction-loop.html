@@ -59,7 +59,7 @@ footer { color: var(--muted); font-size: 0.85rem; }
 <main class="page" id="doc">
   <header>
     <div class="bar">
-      <span class="tag">Agent feedback · v0.1.0</span>
+      <span class="tag">Agent feedback · v0.1.0 · MIT</span>
       <span class="bar" data-export-hide>
         <span id="status" role="status" aria-live="polite"></span>
         <button id="export" class="primary" type="button" hidden>Export as HTML</button>
@@ -99,7 +99,7 @@ footer { color: var(--muted); font-size: 0.85rem; }
 
   <section class="sec" aria-labelledby="install">
     <h2 id="install">Install</h2>
-    <p>You need git and Python 3. On Windows, install Git for Windows, which supplies the <code>sh</code> that runs the hooks. The installer adds <code>jsonschema</code> with pip if it is missing.</p>
+    <p>You need git and Python 3.10 or newer. On Windows, install Git for Windows, which supplies the <code>sh</code> that runs the hooks. The installer adds <code>jsonschema</code> with pip if it is missing.</p>
     <div class="cols">
       <div class="panel">
         <h3>macOS and Linux</h3>
@@ -125,6 +125,7 @@ footer { color: var(--muted); font-size: 0.85rem; }
         <tr><td><code>--publish</code></td><td>Push the insights branch to the remote.</td></tr>
         <tr><td><code>--harness</code></td><td>Extra instruction files besides <code>AGENTS.md</code>: <code>claude</code>, <code>copilot</code>, <code>cursor</code> (all by default) or <code>none</code>.</td></tr>
         <tr><td><code>--no-agents-md</code></td><td>Do not touch <code>AGENTS.md</code>.</td></tr>
+        <tr><td><code>--uninstall</code></td><td>Remove this repository's hooks, <code>.fbl/</code> and the insights worktree. Keeps the <code>fbl-insights</code> branch and the instruction files.</td></tr>
       </tbody>
     </table>
   </section>
@@ -278,8 +279,8 @@ One note per root cause, at most 3 notes. Write nothing if nothing went wrong. Y
       </tbody>
     </table></div>
     <p>Detection only labels the record. An undetected harness is recorded as <code>unknown</code> and everything else still works.</p>
-    <h3>Cloud agents and CI</h3>
-    <p>An agent on a remote machine has no hooks and no <code>.fbl/</code> launcher, because both live in your local <code>.git</code>. The AGENTS.md block tells it to put trailers in its commit messages instead:</p>
+    <h3>Cloud agents and CI (experimental)</h3>
+    <p>This path is experimental and not part of what 0.1.0 promises. An agent on a remote machine has no hooks and no <code>.fbl/</code> launcher, because both live in your local <code>.git</code>. The AGENTS.md block tells it to put trailers in its commit messages instead:</p>
 <div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>Fix payment retry
 
 Friction[repository-discovery]: could not find the payments contract
@@ -296,6 +297,33 @@ apm install &lt;owner&gt;/friction-loop --target claude</pre></div>
     <p>APM only copies files, so it cannot install the hooks. After <code>apm install</code>, ask the agent to set the loop up, or run <code>python .claude/skills/friction-loop/install.py --repo .</code> yourself.</p>
   </section>
 
+  <section class="sec" aria-labelledby="hooks">
+    <h2 id="hooks">Existing hooks and uninstalling</h2>
+    <p>The installer stops rather than overwrite a hook it did not write, and updates its own hooks when you re-run it. If <code>core.hooksPath</code> is set (Husky and similar tools), it refuses, because that folder is tracked and the hooks hold machine-specific paths. Call the tool from your hook manager instead; hook manager support is on the roadmap.</p>
+<div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>python install.py --repo ~/code/my-project --uninstall</pre></div>
+    <p>Uninstalling keeps your history of records (the <code>fbl-insights</code> branch) and the friction block in the instruction files, which you delete by hand.</p>
+  </section>
+
+  <section class="sec" aria-labelledby="roadmap">
+    <h2 id="roadmap">Roadmap</h2>
+    <p>Not in 0.1.0, in the order I would do them.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>When</th><th>Item</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td>Next, after the pilot</td><td>Command-failure capture for Claude Code, then Cursor and Copilot as far as their hooks allow</td><td>An objective signal that does not depend on the agent filing a note. Build it if agents miss more than about a third of sessions with failed verification.</td></tr>
+        <tr><td>Next</td><td>Under-reporting measure</td><td>Count sessions with failed verification and no note, so the report says how much friction goes unreported.</td></tr>
+        <tr><td>Next</td><td>Trend and outcome tracking</td><td>Show whether a fixed doc made its friction notes drop afterwards.</td></tr>
+        <tr><td>Later</td><td>Cloud agents validated for real</td><td>Only a simulated agent commit has run. Confirm Copilot's coding agent and Codex cloud follow the trailer instruction, and detect them.</td></tr>
+        <tr><td>Later</td><td>GitHub Copilot tested in VS Code and the CLI</td><td>Instruction path is untested, and it is not auto-detected.</td></tr>
+        <tr><td>Later</td><td>Hook manager support (Husky, lefthook, pre-commit)</td><td>Today the installer refuses when <code>core.hooksPath</code> is set.</td></tr>
+        <tr><td>Later</td><td>Reusable GitHub Action and a <code>pipx</code> package</td><td>No folder to copy, no workflow files to maintain, one-command upgrades.</td></tr>
+        <tr><td>Later</td><td><code>conflicting-knowledge</code> from the diff</td><td>Flag code changed without the document that describes it, instead of relying on the agent to notice.</td></tr>
+        <tr><td>Later</td><td>Task-context notes cross-checked against the linked issue</td><td>Brief quality lives outside the repository.</td></tr>
+        <tr><td>Ideas</td><td>Multi-repository review, a no-text privacy mode, model-written narration behind the leak check</td><td></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
   <section class="sec" aria-labelledby="privacy">
     <h2 id="privacy">What is stored</h2>
     <ul>
@@ -310,7 +338,7 @@ apm install &lt;owner&gt;/friction-loop --target claude</pre></div>
     <div class="scroll"><table>
       <thead><tr><th>Platform</th><th>State</th></tr></thead>
       <tbody>
-        <tr><td>macOS</td><td>All 122 tests pass. Install, note, commit and record were run end to end through <code>install.sh</code>.</td></tr>
+        <tr><td>macOS</td><td>All 129 tests pass. Install, note, commit and record were run end to end through <code>install.sh</code>.</td></tr>
         <tr><td>Linux</td><td>CI passes on Ubuntu: the test suite and an install smoke test.</td></tr>
         <tr><td>Windows</td><td>CI passes on <code>windows-latest</code>: the same tests plus an install smoke test (install, file a note, commit, record appears). Getting there fixed several test-harness problems; the tool code itself needed no further change. Not tried on a developer's own Windows machine or with PowerShell agents.</td></tr>
       </tbody>

@@ -211,7 +211,7 @@ What you still need to do:
 
 ## The weekly review
 
-Copy `fbl-weekly.yml` from `.apm/skills/friction-loop/tool/templates/` (also installed to the tool folder) to `.github/workflows/` in your project and set the repository variables `FBL_TOOL_REPOSITORY` (where this tool is hosted, e.g. `meabs/AgentFrictionLoop`) and `FBL_TOOL_REF` (a tag or branch). It runs `weekly.py`, which builds the report with `review.py` and opens an issue with `gh issue create` only when the recommended set has changed.
+Copy `fbl-weekly.yml` from `.apm/skills/friction-loop/tool/templates/` (also installed to the tool folder) to `.github/workflows/` in your project and set the repository variables `FBL_TOOL_REPOSITORY` (where this tool is hosted, e.g. `meabs/AgentFrictionLoop`) and `FBL_TOOL_REF` (a tag or branch). It runs `weekly.py`, which builds the report with `review.py` and opens an issue with `gh issue create` only when the set of real recommendations has changed. Findings that sit with one or two people stay in the report and are left out of the issue.
 
 Set the repository variable `FBL_ISSUE_NOTES` to `true` to add the agents' note text to the issue body (the report on the branch never contains note text). A finding becomes a recommendation only when enough records and more than one person back it. Smaller ones are labelled "Not established", so one agent's bad day does not become advice.
 

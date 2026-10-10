@@ -20,8 +20,13 @@ def recommended_section(markdown: str) -> str:
     return match.group(1).strip() if match else ""
 
 
+def actionable(section: str) -> str:
+    """The recommendations only. 'Not recommended (concentrated in few people)' lines stay in the report, not the issue."""
+    return section.split("Not recommended (concentrated", 1)[0].strip()
+
+
 def has_recommendations(section: str) -> bool:
-    return any(line.startswith("- F-") for line in section.splitlines())
+    return any(line.startswith("- F-") for line in actionable(section).splitlines())
 
 
 def agent_notes(facts_path: Path) -> str:
@@ -52,7 +57,7 @@ def run(insights: Path, push: bool, remote: str, today: str | None = None, inclu
             f"Weekly agent-feedback review for {today}.\n\n"
             "These are leads from agent friction notes and session metrics, not proof. "
             f"Full report and evidence records are on the `{insights_sync.BRANCH}` branch: `reports/{today}.md`.\n\n"
-            f"## Recommended improvements\n\n{section}\n"
+            f"## Recommended improvements\n\n{actionable(section)}\n"
             + (f"\n## Agent notes\n\nWhat agents wrote, as filed (secrets are filtered at write time):\n\n{notes}\n" if include_notes and (notes := agent_notes(report.with_name(report.stem + ".facts.json"))) else ""),
             encoding="utf-8",
         )

@@ -33,3 +33,11 @@ def test_agent_notes_come_from_facts_and_missing_file_is_empty(tmp_path: Path):
     path.write_text(json.dumps({"findings": [{"id": "F-002", "friction_samples": ["a", "b"]}, {"id": "F-003"}]}))
     assert weekly.agent_notes(path) == "- F-002: a\n- F-002: b"
     assert weekly.agent_notes(tmp_path / "none.json") == ""
+
+
+def test_issue_ignores_findings_concentrated_in_few_people():
+    only_concentrated = "No established recommendations.\nNot recommended (concentrated in few people):\n- F-001: 1 distinct actors across 2 attributed records; largest share 100%."
+    assert not weekly.has_recommendations(only_concentrated)
+    real = "- F-001: Observation: First tests verification attempt failed in 10 sessions. Proposed change: x.\nNot recommended (concentrated in few people):\n- F-002: y"
+    assert weekly.has_recommendations(real)
+    assert "F-002" not in weekly.actionable(real)
