@@ -101,9 +101,10 @@ Each note has an **origin**: where the problem started, which decides who can fi
 | Insights branch | Creates the orphan branch `fbl-insights` as a linked worktree, or adopts the remote one | `.git/fbl/insights` |
 | Hooks | Writes `post-commit` and `pre-push`; updates hooks it wrote earlier, stops rather than overwrite one it did not write, refuses if `core.hooksPath` is set | `.git/hooks/` |
 | Publish (optional) | Commits the shared actor salt and schema, pushes the branch | the remote |
+| Command capture | Writes hook configs that send each shell command's result to `boundary.py command`: `.claude/settings.local.json`, `.cursor/hooks.json`, `.github/hooks/fbl-commands.json`. Existing settings are merged, tracked files are left alone, and all three are excluded from git | project root |
 | Instructions | Appends the friction block to `AGENTS.md`, `.github/copilot-instructions.md` and `.cursor/rules/friction-reporting.mdc`, and adds `@AGENTS.md` to `CLAUDE.md`. Skips any file that already has a `## Friction reporting` heading; everything is left uncommitted | project root |
 
-Options: `--uninstall` (see below), `--repo` (default `.`), `--harness` (extra instruction files: `claude`, `copilot`, `cursor`, or `none`; default all three), `--domain` (team label stored with each record), `--adapter boundary|codex|boundary,codex|none` (`codex` also reads local Codex session files for token and cost figures), `--home` (tool location), `--publish`, `--no-agents-md`.
+Options: `--no-command-capture` (skip the shell-command hooks), `--uninstall` (see below), `--repo` (default `.`), `--harness` (extra instruction files: `claude`, `copilot`, `cursor`, or `none`; default all three), `--domain` (team label stored with each record), `--adapter boundary|codex|boundary,codex|none` (`codex` also reads local Codex session files for token and cost figures), `--home` (tool location), `--publish`, `--no-agents-md`.
 
 Hooks run in the background and never block a commit or push. Failures are logged to `var/hook.log` inside the tool folder. If the network is down, records stay committed locally and go out with the next push.
 
@@ -235,13 +236,23 @@ The note path does not depend on a particular agent: it is a command line call p
 
 | Harness | Reads instructions from | Files notes with | Detected as | Extra signal | Tested |
 | --- | --- | --- | --- | --- | --- |
-| Claude Code | `CLAUDE.md` (installer adds `@AGENTS.md`) | `fbl-friction` launcher | yes (`CLAUDECODE`, `CLAUDE_CODE_SESSION_ID`) | none yet | launcher and detection run in this project's own sessions |
+| Claude Code | `CLAUDE.md` (installer adds `@AGENTS.md`) | `fbl-friction` launcher | yes (`CLAUDECODE`, `CLAUDE_CODE_SESSION_ID`) | shell-command results from a `PostToolUse` hook | notes and command capture verified in a live `claude -p` session |
 | Codex CLI | `AGENTS.md` | launcher | yes (`CODEX_THREAD_ID`, `CODEX_SESSION_ID`, `CODEX_CI`) | token, cost and command failures from local session files with `--adapter codex` | real sessions in the original experiment |
-| Cursor | `AGENTS.md` and `.cursor/rules/friction-reporting.mdc` (always applied) | launcher | yes (`CURSOR_AGENT`, `CURSOR_CONVERSATION_ID`) | none yet | real sessions in the original experiment |
-| GitHub Copilot (VS Code agent mode, CLI) | `.github/copilot-instructions.md` | launcher | no; set `FBL_HARNESS=copilot` to label it | none | **not tested**; instruction path is the documented Copilot location, not exercised here |
+| Cursor | `AGENTS.md` and `.cursor/rules/friction-reporting.mdc` (always applied) | launcher | yes (`CURSOR_AGENT`, `CURSOR_CONVERSATION_ID`) | shell-command failures via `postToolUseFailure`; successes only if the payload carries an exit code | notes: real sessions in the original experiment. **Command hook written to the documented format, not yet run** |
+| GitHub Copilot (CLI, cloud agent; VS Code agent mode has no documented hooks) | `.github/copilot-instructions.md` (Copilot also reads `AGENTS.md` and `CLAUDE.md`) | launcher | no; set `FBL_HARNESS=copilot` to label it | `postToolUse` / `postToolUseFailure` hooks (CLI, cloud agent): success or failure, no exit code | **Not tested.** Hook config written to the documented format |
 | Cloud agents, experimental (Copilot coding agent, Codex cloud, Cursor background agents) | whichever file the product reads, same as above | commit trailers, no launcher | no (recorded as `unknown`) | none | trailer parsing is tested; `fbl-record.yml` ran on GitHub Actions in a private test repo, fed by an agent-style commit I made, not by a real Copilot or Codex cloud run |
 
 Detection only labels the record; a harness that is not detected is recorded as `unknown` and everything else still works.
+
+### Command capture
+
+Notes depend on the agent remembering to write one. Command capture adds an objective signal: each harness's after-shell-command hook calls `boundary.py command`, which stores an event with the command's leading words, its exit code and a kind (`tests`, `lint`, `build`, `migrate`, `install`, `git`, `other`). The record then shows failed commands and whether the first test run passed, even when no note was filed.
+
+What is stored is deliberately small. Output is discarded before anything is written. The signature is the executable plus up to two plain lowercase words, stopping at the first flag, so `uv run pytest -x tests/secret_name.py` becomes `uv run pytest`. For anything that is not a recognised test, lint, build, migrate or install step, only the executable name is kept, so `mycli login hunter2` is stored as `mycli`. Commands in quotes are never split open. The hook is silent and always exits 0, so it cannot disturb the agent.
+
+Claude Code is verified in a live session: a failing `python3 -c 'import sys; sys.exit(2)'` produced a command event with exit code 2, and the commit's record listed it under failed commands next to the agent's note. Claude Code's real payload differs from its documentation: there is no `exit_code` field, and a failure arrives as `PostToolUseFailure` with `error: "Exit code N …"`. The parser reads that number and nothing else from the error text.
+
+Cursor's shell hook documents no exit code, so only failures (from `postToolUseFailure`) are recorded unless the payload turns out to include one; the tool never records a success it cannot see. Copilot's hooks give success or failure only. The Cursor and Copilot configs follow the documented formats and have not been run yet.
 
 ### Cloud agents and CI (experimental)
 
@@ -304,14 +315,14 @@ Windows differences: file locking uses `msvcrt` instead of `fcntl`; git runs wit
 - Cloud-hosted agents have no launcher or hooks. They rely on commit trailers and the `fbl-record.yml` workflow. That workflow has only been exercised with a simulated agent commit, not a real cloud agent.
 - Notes are self-reported. Treat them as leads unless a command failure or transcript signal agrees.
 - Five origins split a small sample thin; with few records most findings stay "Not established".
-- Copilot has not been tested at all, and Claude Code and Cursor give no command-failure signal, only notes.
+- Copilot and Cursor command hooks follow the vendors' documented formats but have not run. Copilot's hooks report success or failure with no exit code, and VS Code agent mode has no documented hooks.
 
 ## Roadmap
 
 Not in 0.1.0, roughly in the order I would do them.
 
 **Next, decided by the first pilot**
-- **Command-failure capture for Claude Code.** A hook after each shell command logs the command's first words, exit code and kind (tests, lint, build, migrate), never output. It gives an objective signal that does not depend on the agent filing a note. Build it if agents miss more than about a third of the sessions that had failed verification. Cursor and Copilot after that, as far as their hooks allow.
+- **Verify command capture in Cursor and Copilot.** The hook configs exist; run a failing command in each, check what the payloads really carry (Claude Code's did not match its documentation), and fix the parsers. Copilot's cloud agent only runs hooks that are committed to the repository, so it needs a committed variant with no machine-specific paths.
 - **Under-reporting measure.** Count sessions with failed verification and no note, so the report says how much friction goes unreported.
 - **Trend and outcome tracking.** The review already has a ledger of recommendations. Wire it up so a fixed doc shows whether its friction notes dropped afterwards.
 

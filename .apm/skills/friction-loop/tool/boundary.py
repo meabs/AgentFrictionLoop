@@ -72,6 +72,19 @@ def friction(args: argparse.Namespace) -> int:
     return 0
 
 
+def command(args: argparse.Namespace) -> int:
+    """Hook entry point: read a harness's after-shell-command payload on stdin. Silent, and never fails the agent."""
+    try:
+        from feedback_loop.boundary import commands
+        raw = sys.stdin.read(1_000_000)
+        payload = json.loads(raw) if raw.strip() else {}
+        if isinstance(payload, dict):
+            commands.record(args.harness, payload)
+    except Exception:
+        pass
+    return 0
+
+
 def events_command(args: argparse.Namespace) -> int:
     from feedback_loop.boundary.events import _event_path
     path = _event_path(str(Path(args.repo).resolve()))[1]
@@ -100,6 +113,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("install"); p.add_argument("--repo", required=True); p.set_defaults(func=install)
     p = sub.add_parser("events"); p.add_argument("--repo", required=True); p.add_argument("--since"); p.add_argument("--session"); p.add_argument("--json", action="store_true"); p.set_defaults(func=events_command)
+    p = sub.add_parser("command"); p.add_argument("--harness", default="unknown"); p.set_defaults(func=command)
     p = sub.add_parser("friction"); p.add_argument("--category"); p.add_argument("--origin"); p.add_argument("text"); p.set_defaults(func=friction)
     args = parser.parse_args(argv)
     return args.func(args)
