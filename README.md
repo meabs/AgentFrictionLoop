@@ -354,7 +354,7 @@ Not in 0.2.0, roughly in the order I would do them.
 ```
 install.sh, install.ps1            wrappers for install.py
 apm.yml                            APM manifest
-docs/friction-loop.html            explainer page
+docs/index.html                    explainer page (GitHub Pages)
 .github/workflows/test.yml         tests on Ubuntu, macOS, Windows + install smoke test
 .apm/skills/friction-loop/
   SKILL.md                         agent instructions

@@ -404,11 +404,26 @@ apm install &lt;owner&gt;/friction-loop --target claude</pre></div>
 
   var exportBtn = document.getElementById("export");
   var downloads = null;
-  (window.claude && window.claude.use ? window.claude.use("downloads") : Promise.resolve(null)).then(function (d) {
-    if (!d) return;
-    downloads = d; exportBtn.hidden = false;
-  }, function () {});
+  // In a Claude artifact the downloads capability saves the file; on a normal website a plain download link does.
+  function plainDownload() {
+    var url = URL.createObjectURL(new Blob([buildExport()], { type: "text/html" }));
+    var a = document.createElement("a");
+    a.href = url; a.download = "friction-loop.html";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    say("Saved friction-loop.html");
+  }
+  var inArtifact = !!(window.claude && window.claude.use);
+  if (inArtifact) {
+    window.claude.use("downloads").then(function (d) {
+      if (!d) return;
+      downloads = d; exportBtn.hidden = false;
+    }, function () {});
+  } else {
+    exportBtn.hidden = false;
+  }
   exportBtn.addEventListener("click", function () {
+    if (!inArtifact) return plainDownload();
     if (!downloads) return;
     downloads.save({ filename: "friction-loop.html", data: new Blob([buildExport()], { type: "text/html" }) }).then(
       function () { say("Saved friction-loop.html"); },
