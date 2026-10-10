@@ -176,7 +176,7 @@ def test_cli_invalid_ci_results_normal_and_fail_open(tmp_path: Path):
 
 def test_installed_hook_is_async_and_never_dirties_committed_repo(tmp_path: Path):
     repo = make_repo(tmp_path, {"app.py": "x\n"})
-    install = subprocess.run([str(ROOT / "insights_sync.py"), "install", "--repo", str(repo), "--domain", "platform"], text=True, capture_output=True)
+    install = subprocess.run([sys.executable, str(ROOT / "insights_sync.py"), "install", "--repo", str(repo), "--domain", "platform"], text=True, capture_output=True)
     assert install.returncode == 0, install.stderr
     insights = insights_sync.worktree_path(repo)
     hook = repo / ".git/hooks/post-commit"
