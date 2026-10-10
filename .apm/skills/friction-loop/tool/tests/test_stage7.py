@@ -13,6 +13,13 @@ from pathlib import Path
 import insights_sync
 import weekly
 
+
+
+def launcher(path: Path) -> list[str]:
+    """The command an agent would run: the .cmd launcher on Windows, the sh one elsewhere."""
+    bindir = path / ".fbl" / "bin"
+    return [str(bindir / "fbl-friction.cmd")] if os.name == "nt" else [str(bindir / "fbl-friction")]
+
 ROOT = Path(__file__).parents[1]
 
 
@@ -204,7 +211,7 @@ def test_installed_hook_attaches_a_friction_note_filed_before_the_commit(tmp_pat
     assert insights_sync.main(["install", "--repo", str(dev), "--domain", "demo"]) == 0
     assert "FBL_ADAPTER='boundary'" in (dev / ".git/hooks/post-commit").read_text()
     env = {**os.environ, "FBL_HARNESS": "codex", "FBL_SESSION_ID": "s-hook-1"}
-    subprocess.run([str(dev / ".fbl/bin/fbl-friction"), "--category", "test-order", "Tests failed until migrations were applied."], cwd=dev, env=env, check=True, capture_output=True)
+    subprocess.run([*launcher(dev), "--category", "test-order", "Tests failed until migrations were applied."], cwd=dev, env=env, check=True, capture_output=True)
     commit(dev, "work")
     wt = insights_sync.worktree_path(dev)
     deadline = time.time() + 30

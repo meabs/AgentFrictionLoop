@@ -19,6 +19,7 @@ jobs:
         run: |
           mkdir proj && cd proj && git init -q && git commit -q --allow-empty -m init
           python ../.apm/skills/friction-loop/install.py --repo . --domain ci --home "$RUNNER_TEMP/fbl"
-          ./.fbl/bin/fbl-friction --category missing-doc "ci smoke note"
+          ./.fbl/bin/fbl-friction --origin execution-environment "ci smoke note"
           echo x > a && git add a && git commit -q -m c && sleep 5
-          git log fbl-insights --oneline | grep -q record
+          git log fbl-insights --oneline > log.txt
+          grep -q record log.txt

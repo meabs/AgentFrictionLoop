@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -13,6 +14,13 @@ from feedback_loop.boundary_adapter import enrich_record
 from feedback_loop.record import build_record
 from feedback_loop.report import render_report, validate_report
 from feedback_loop.review_core import detect_patterns, effect_analysis
+
+
+
+def launcher(path: Path) -> list[str]:
+    """The command an agent would run: the .cmd launcher on Windows, the sh one elsewhere."""
+    bindir = path / ".fbl" / "bin"
+    return [str(bindir / "fbl-friction.cmd")] if os.name == "nt" else [str(bindir / "fbl-friction")]
 
 ROOT = Path(__file__).parents[1]
 SCHEMA = Draft202012Validator(json.loads((ROOT / "schemas/analysis-v1.schema.json").read_text()))
@@ -228,7 +236,7 @@ def test_end_to_end_cursor_boundary_analysis_and_review(tmp_path):
     insights = tmp_path / "insights"
     for number in range(3):
         session = f"cursor-{number}"; run_env = {**env, "CURSOR_AGENT": "1", "CURSOR_CONVERSATION_ID": session, "FBL_SESSION_ID": session}
-        subprocess.run([str(path / ".fbl/bin/fbl-friction"), "--category", "test-order", "tests need setup"], cwd=path, env=run_env, check=True, capture_output=True)
+        subprocess.run([*launcher(path), "--category", "test-order", "tests need setup"], cwd=path, env=run_env, check=True, capture_output=True)
         (path / f"file{number}.txt").write_text(str(number)); subprocess.run(["git", "add", "."], cwd=path, env=env, check=True); subprocess.run(["git", "commit", "-qm", f"change {number}\n\nFriction[test-order]: tests need setup"], cwd=path, env=env, check=True)
         subprocess.run([sys.executable, str(ROOT / "analyse-change.py"), "--repo", str(path), "--commit", "HEAD", "--insights", str(insights), "--adapter", "boundary", "--no-commit"], cwd=ROOT, env=env, check=True)
     out = tmp_path / "report.md"

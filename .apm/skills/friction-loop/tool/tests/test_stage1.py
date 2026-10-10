@@ -150,7 +150,7 @@ def test_concurrent_runs_leave_consistent_insights_repo(tmp_path: Path):
     repo = make_repo(tmp_path, {"app.py": "x\n"})
     insights = tmp_path / "insights"
     record = build_record(repo)
-    ctx = multiprocessing.get_context("fork")
+    ctx = multiprocessing.get_context("fork" if "fork" in multiprocessing.get_all_start_methods() else "spawn")
     processes = [ctx.Process(target=_persist_worker, args=(str(insights), str(SCHEMA), record)) for _ in range(2)]
     for process in processes:
         process.start()
@@ -199,7 +199,7 @@ def test_hook_without_insights_logs_and_exits_zero(tmp_path: Path):
     env = os.environ.copy()
     env.pop("FBL_INSIGHTS", None)
     env["FBL_HOME"] = str(tmp_path / "tool")
-    result = subprocess.run([str(ROOT / "hooks/post-commit")], cwd=repo, env=env, text=True, capture_output=True)
+    result = subprocess.run(["sh", str(ROOT / "hooks/post-commit")], cwd=repo, env=env, text=True, capture_output=True)
     assert result.returncode == 0
     assert "FBL_INSIGHTS is unset" in (tmp_path / "tool/var/hook.log").read_text(encoding="utf-8")
 
@@ -209,7 +209,7 @@ def test_hook_returns_zero_without_waiting_when_analyser_is_broken(tmp_path: Pat
     env = os.environ.copy()
     env.update(FBL_HOME=str(tmp_path / "missing-tool"), FBL_INSIGHTS=str(tmp_path / "insights"))
     started = time.monotonic()
-    result = subprocess.run([str(ROOT / "hooks/post-commit")], cwd=repo, env=env, text=True, capture_output=True)
+    result = subprocess.run(["sh", str(ROOT / "hooks/post-commit")], cwd=repo, env=env, text=True, capture_output=True)
     assert result.returncode == 0
     assert time.monotonic() - started < 2
     time.sleep(0.2)

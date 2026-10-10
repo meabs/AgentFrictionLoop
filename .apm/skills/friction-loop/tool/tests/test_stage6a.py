@@ -8,6 +8,13 @@ from pathlib import Path
 
 from feedback_loop.boundary.events import _harness, session
 
+
+
+def launcher(path: Path) -> list[str]:
+    """The command an agent would run: the .cmd launcher on Windows, the sh one elsewhere."""
+    bindir = path / ".fbl" / "bin"
+    return [str(bindir / "fbl-friction.cmd")] if os.name == "nt" else [str(bindir / "fbl-friction")]
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -52,7 +59,7 @@ def test_friction_sanitizes_category_text_and_secret_drop(tmp_path: Path):
 
 def test_friction_launcher_works_from_subdirectory_and_truncates(tmp_path: Path):
     path = repo(tmp_path); install(path); child = path / "sub"; child.mkdir()
-    result = subprocess.run([str(path / ".fbl/bin/fbl-friction"), "--category", "environment", "x" * 300], cwd=child, capture_output=True, text=True)
+    result = subprocess.run([*launcher(path), "--category", "environment", "x" * 300], cwd=child, capture_output=True, text=True)
     assert result.returncode == 0 and len(events(path)[0]["text"]) == 240
 
 
