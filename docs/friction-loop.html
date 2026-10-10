@@ -274,7 +274,7 @@ One note per root cause, at most 3 notes. Write nothing if nothing went wrong. Y
         <tr><td>Codex CLI</td><td><code>AGENTS.md</code></td><td>launcher</td><td>Real sessions in the original experiment. <code>--adapter codex</code> also reads token, cost and command failures from local session files.</td></tr>
         <tr><td>Cursor</td><td><code>AGENTS.md</code> and an always-applied rule in <code>.cursor/rules/</code></td><td>launcher</td><td>Real sessions in the original experiment.</td></tr>
         <tr><td>GitHub Copilot (VS Code agent mode, CLI)</td><td><code>.github/copilot-instructions.md</code></td><td>launcher</td><td><strong>Not tested.</strong> It is not auto-detected; set <code>FBL_HARNESS=copilot</code> to label it.</td></tr>
-        <tr><td>Cloud agents (Copilot coding agent, Codex cloud, Cursor background agents)</td><td>the same files</td><td>commit trailers</td><td>Trailer parsing is tested, and the recording workflow ran locally. It has not run on GitHub Actions.</td></tr>
+        <tr><td>Cloud agents (Copilot coding agent, Codex cloud, Cursor background agents)</td><td>the same files</td><td>commit trailers</td><td>Trailer parsing is tested. The recording workflow ran on GitHub Actions in a private test repo, fed by an agent-style commit I made, not by a real cloud agent.</td></tr>
       </tbody>
     </table></div>
     <p>Detection only labels the record. An undetected harness is recorded as <code>unknown</code> and everything else still works.</p>
@@ -319,7 +319,7 @@ apm install &lt;owner&gt;/friction-loop --target claude</pre></div>
       <h3>What Windows support changes</h3>
       <p>File locking uses <code>msvcrt</code> instead of <code>fcntl</code>. Git commands run with an empty hooks directory instead of <code>/dev/null</code>. Hook scripts get forward-slash paths and the Python interpreter recorded at install time. Agents on PowerShell or cmd use the <code>fbl-friction.cmd</code> launcher; Git Bash uses the shell one.</p>
     </div>
-    <p>Not yet run on GitHub: the weekly workflow and <code>gh issue create</code>. Cloud-hosted agents are out of reach, since the hooks only run on a developer's machine.</p>
+    <p>Run on GitHub Actions in a private test repo: the recording workflow (a commit with three trailers became a record with all three notes) and the weekly workflow, including <code>gh issue create</code>. The commit was a simulated agent commit, not a real Copilot or Codex cloud run. The weekly issue lists findings by id and counts only; the detail is in the report on the insights branch.</p>
   </section>
 
   <footer>Source: <code>friction-tool/</code>, extracted from <code>agent-feedback-loop</code>.</footer>

@@ -236,7 +236,7 @@ The note path does not depend on a particular agent: it is a command line call p
 | Codex CLI | `AGENTS.md` | launcher | yes (`CODEX_THREAD_ID`, `CODEX_SESSION_ID`, `CODEX_CI`) | token, cost and command failures from local session files with `--adapter codex` | real sessions in the original experiment |
 | Cursor | `AGENTS.md` and `.cursor/rules/friction-reporting.mdc` (always applied) | launcher | yes (`CURSOR_AGENT`, `CURSOR_CONVERSATION_ID`) | none yet | real sessions in the original experiment |
 | GitHub Copilot (VS Code agent mode, CLI) | `.github/copilot-instructions.md` | launcher | no; set `FBL_HARNESS=copilot` to label it | none | **not tested**; instruction path is the documented Copilot location, not exercised here |
-| Cloud agents (Copilot coding agent, Codex cloud, Cursor background agents) | whichever file the product reads, same as above | commit trailers, no launcher | no (recorded as `unknown`) | none | trailer parsing is tested; the workflow below has been run locally, not on GitHub Actions |
+| Cloud agents (Copilot coding agent, Codex cloud, Cursor background agents) | whichever file the product reads, same as above | commit trailers, no launcher | no (recorded as `unknown`) | none | trailer parsing is tested; `fbl-record.yml` ran on GitHub Actions in a private test repo, fed by an agent-style commit I made, not by a real Copilot or Codex cloud run |
 
 Detection only labels the record; a harness that is not detected is recorded as `unknown` and everything else still works.
 
@@ -252,6 +252,10 @@ Friction[verification]: no single-test command documented
 ```
 
 Copy `templates/fbl-record.yml` (installed to the tool folder) to `.github/workflows/` and set the repository variables `FBL_TOOL_REPOSITORY`, `FBL_TOOL_REF` and `FBL_DOMAIN`. On every push to `main` it records each new commit, trailers included, on the `fbl-insights` branch. If a developer's machine already recorded the commit, the existing record is kept. Trailers also work locally and are merged with notes filed through the launcher.
+
+### Verified on GitHub Actions
+
+In a private test repo, a commit with three `Friction[...]` trailers pushed to `main` produced a record on the remote `fbl-insights` branch with all three notes and their origins. The weekly workflow then ran by manual dispatch, wrote `reports/<date>.md` to the branch, and `gh issue create` opened an issue.
 
 ## Platforms
 
@@ -280,11 +284,11 @@ Windows differences: file locking uses `msvcrt` instead of `fcntl`; git runs wit
 
 ## Limits
 
-- Cloud-hosted agents have no launcher or hooks. They rely on commit trailers and the `fbl-record.yml` workflow, which has not run on GitHub yet.
+- Cloud-hosted agents have no launcher or hooks. They rely on commit trailers and the `fbl-record.yml` workflow. That workflow has only been exercised with a simulated agent commit, not a real cloud agent.
 - Notes are self-reported. Treat them as leads unless a command failure or transcript signal agrees.
 - Five origins split a small sample thin; with few records most findings stay "Not established".
 - The check that keeps note text out of the report is a substring match, so a very short note (for example `x`) can make `review.py` fail with "report contains friction sample text".
-- The weekly workflow and `gh issue create` have not been run on GitHub.
+- The weekly issue lists findings by id and counts only (`F-001: 1 distinct actors across 2 attributed records…`), without saying what each finding is. The report on the `fbl-insights` branch has the detail.
 - Copilot has not been tested at all, and Claude Code and Cursor give no command-failure signal, only notes.
 
 ## Repository layout and development
