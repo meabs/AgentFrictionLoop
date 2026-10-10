@@ -135,6 +135,10 @@ def _as_command(value: Any) -> str | None:
 
 
 def _int(value: Any) -> int | None:
+    if isinstance(value, float):  # Cursor sends duration as a float in milliseconds, sometimes as a string
+        return int(round(value))
+    if isinstance(value, str) and re.fullmatch(r"\d+(?:\.\d+)?", value.strip()):
+        return int(round(float(value)))
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
@@ -151,23 +155,29 @@ def parse(harness: str, payload: dict[str, Any]) -> dict[str, Any] | None:
         return None
     if payload.get("is_interrupt") or payload.get("interrupted"):
         return None  # cancelled by the user, not an outcome of the command
+    if payload.get("failure_type") not in (None, "error"):
+        return None  # Cursor also reports timeouts and permission denials, which say nothing about the command itself
     exit_code = _int(_find(payload, "exit_code", "exitCode", "tool_response.exit_code", "toolResult.exit_code", "toolResult.exitCode"))
     if exit_code is None:
         # Claude Code (verified in a live session) sends no exit_code field: a failure arrives as
         # PostToolUseFailure with error "Exit code N ...". Only that leading number is read; the rest is output.
-        match = re.match(r"\s*Exit code (\d{1,3})\b", str(payload.get("error") or ""))
+        # Cursor (verified live) uses error_message: "Command failed with exit code N", or the command's output.
+        message = str(payload.get("error") or payload.get("error_message") or "")
+        match = re.match(r"\s*(?:Command failed with )?[Ee]xit code (\d{1,3})\b", message)
         if match:
             exit_code = int(match.group(1))
-        elif failed_hook or _find(payload, "error"):
+        elif failed_hook or _find(payload, "error", "error_message"):
             exit_code = 1
-        elif harness == "copilot" and str(_find(payload, "toolResult.resultType") or "") == "success":
-            exit_code = 0
-        elif harness == "claude-code" and event_name == "PostToolUse":
+        elif harness == "copilot" and (match := re.search(r"completed with exit code (-?\d{1,3})>\s*\Z", str(_find(payload, "toolResult.textResultForLlm") or ""))):
+            # Copilot CLI (verified live) reports resultType "success" even for a nonzero exit; the real code is only
+            # in the result text, "<shellId: 0 completed with exit code 1>". Without it the outcome is unknown.
+            exit_code = int(match.group(1))
+        elif harness in {"claude-code", "cursor"} and event_name.lower() == "posttooluse":
             exit_code = 0
         else:
             return None  # Cursor's shell hook documents no exit code: do not claim success
     duration = _int(_find(payload, "duration", "duration_ms", "durationMs")) or 0
-    return {"command": command, "exit_code": exit_code, "session": _find(payload, "session_id", "sessionId", "conversation_id"), "cwd": _find(payload, "cwd") or os.getcwd(), "duration_ms": max(duration, 0)}
+    return {"command": command, "exit_code": exit_code, "session": _find(payload, "session_id", "sessionId", "conversation_id"), "cwd": _find(payload, "cwd", "tool_input.cwd") or ((payload.get("workspace_roots") or [None])[0]) or os.getcwd(), "duration_ms": max(duration, 0)}
 
 
 def record(harness: str, payload: dict[str, Any], env: dict[str, str] | None = None) -> bool:

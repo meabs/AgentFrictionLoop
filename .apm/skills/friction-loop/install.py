@@ -107,12 +107,13 @@ def command_capture(repo: Path, home: Path, wanted: set[str]) -> list[str]:
     if "cursor" in wanted:
         rel = ".cursor/hooks.json"
         if _tracked(repo, rel):
-            print(f"{rel} is tracked by git; not modified. Add `{cmd('cursor')}` to afterShellExecution and postToolUseFailure yourself.")
+            print(f"{rel} is tracked by git; not modified. Add `{cmd('cursor')}` to postToolUse and postToolUseFailure yourself.")
         else:
             config = _load(repo / rel)
             config.setdefault("version", 1)
             entry = {"command": cmd("cursor")}
-            _merge(config, "afterShellExecution", entry)
+            # afterShellExecution fires for successes and failures alike with no exit code (verified live), so it is not used.
+            _merge(config, "postToolUse", entry)
             _merge(config, "postToolUseFailure", entry)
             _write(repo / rel, config); targets.append(rel); done.append(rel)
     if "copilot" in wanted:
@@ -250,6 +251,8 @@ def main() -> int:
         captured = command_capture(repo, home, wanted)
         if captured:
             print("wrote shell-command capture to: " + ", ".join(captured) + " (local only, excluded from git)")
+        if "copilot" in wanted:
+            print("note: the Copilot CLI only runs a repository's hooks in folders you have trusted; open the folder in copilot once and accept the trust prompt")
     if written:
         print("wrote the friction instructions to: " + ", ".join(written) + " (review and commit)")
     print(f"done. For cloud agents copy {home / 'templates/fbl-record.yml'} and for the weekly report {home / 'templates/fbl-weekly.yml'} to {repo / '.github/workflows'}, then set FBL_TOOL_REPOSITORY, FBL_TOOL_REF and FBL_DOMAIN.")

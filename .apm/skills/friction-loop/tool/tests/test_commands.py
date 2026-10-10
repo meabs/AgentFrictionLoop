@@ -61,6 +61,18 @@ def test_claude_code_payloads_as_actually_sent():
     assert parse("claude-code", {**failure, "error": "tool crashed"})["exit_code"] == 1
 
 
+def test_copilot_cli_payloads_as_actually_sent():
+    """Captured from a live Copilot CLI 1.0.95 session: resultType is "success" even for a nonzero exit."""
+    def payload(text):
+        return {"sessionId": "s", "timestamp": 1, "cwd": "/work/repo", "toolName": "bash", "toolArgs": {"command": "python3 -m pytest -q", "description": "d"}, "toolResult": {"resultType": "success", "textResultForLlm": text}}
+    assert parse("copilot", payload("\n<shellId: 0 completed with exit code 1>"))["exit_code"] == 1
+    assert parse("copilot", payload("1\n<shellId: 1 completed with exit code 0>"))["exit_code"] == 0
+    # output that merely mentions an exit code must not be mistaken for the trailer
+    assert parse("copilot", payload("job said: exit code 7 seen\n<shellId: 2 completed with exit code 0>"))["exit_code"] == 0
+    assert parse("copilot", payload("exit code 9 in the output, no trailer")) is None
+    assert parse("copilot", payload("x\n<shellId: 0 completed with exit code 2>"))["cwd"] == "/work/repo"
+
+
 def test_operators_inside_quotes_do_not_split_the_command():
     assert classify("python3 -c 'import sys; sys.exit(2)'") == ("other", "python3")
     assert classify("python3 -c \"token='abc'; print(1)\"") == ("other", "python3")
@@ -74,12 +86,25 @@ def test_payloads_in_each_harnesss_documented_shape():
     claude_ok = {"hook_event_name": "PostToolUse", "tool_name": "Bash", "tool_input": {"command": "npm test"}, "tool_response": {"text": "SECRET OUTPUT"}, "exit_code": 0}
     assert parse("claude-code", claude_ok)["exit_code"] == 0 and "SECRET" not in json.dumps(parse("claude-code", claude_ok))
     assert parse("claude-code", {"tool_name": "Read", "tool_input": {"file_path": "x"}}) is None
-    assert parse("copilot", {"toolName": "bash", "toolArgs": "{\"command\":\"pytest\"}", "toolResult": {"resultType": "success"}, "sessionId": "c1"})["exit_code"] == 0
+    assert parse("copilot", {"toolName": "bash", "toolArgs": "{\"command\":\"pytest\"}", "toolResult": {"resultType": "success", "textResultForLlm": "ok\n<shellId: 1 completed with exit code 0>"}, "sessionId": "c1"})["exit_code"] == 0
     assert parse("copilot", {"hook_event_name": "postToolUseFailure", "toolName": "powershell", "toolArgs": {"command": "pytest"}, "error": "boom"})["exit_code"] == 1
     assert parse("copilot", {"toolName": "view", "toolArgs": {"path": "x"}}) is None
-    # Cursor's shell hook documents no exit code: claim neither success nor failure.
-    assert parse("cursor", {"command": "npm test", "output": "SECRET", "duration": 12}) is None
-    assert parse("cursor", {"hook_event_name": "postToolUseFailure", "command": "npm test"})["exit_code"] == 1
+    # Cursor's afterShellExecution has no exit code and fires for successes too: claim neither.
+    assert parse("cursor", {"hook_event_name": "afterShellExecution", "command": "npm test", "output": "SECRET", "duration": 12}) is None
+
+
+def test_cursor_payloads_as_actually_sent():
+    """Captured from a live cursor-agent 2026.10.01 session."""
+    base = {"conversation_id": "c", "session_id": "c", "tool_name": "Shell", "tool_input": {"command": "python3 -m pytest -q", "cwd": "", "timeout": 30000}, "duration": 684.39, "workspace_roots": ["/work/repo"], "cwd": ""}
+    failure = {**base, "hook_event_name": "postToolUseFailure", "error_message": "Command failed with exit code 3", "failure_type": "error", "is_interrupt": False}
+    parsed = parse("cursor", failure)
+    assert parsed["exit_code"] == 3 and parsed["duration_ms"] == 684 and parsed["cwd"] == "/work/repo" and parsed["session"] == "c"
+    output_only = {**failure, "error_message": "/usr/bin/python3: No module named pytest SECRET"}
+    assert parse("cursor", output_only)["exit_code"] == 1 and "SECRET" not in json.dumps(parse("cursor", output_only))
+    success = {**base, "hook_event_name": "postToolUse", "tool_output": "1\n"}
+    assert parse("cursor", success)["exit_code"] == 0
+    assert parse("cursor", {**failure, "failure_type": "timeout"}) is None
+    assert parse("cursor", {**base, "hook_event_name": "postToolUse", "tool_name": "Read"}) is None
 
 
 def test_hook_writes_a_valid_event_and_drops_output(tmp_path: Path):
@@ -139,7 +164,7 @@ def test_install_writes_local_hook_configs_and_keeps_existing_settings(tmp_path:
     assert [e["matcher"] for e in claude["hooks"]["PostToolUse"]] == ["Edit", "Bash"]
     assert "boundary.py" in claude["hooks"]["PostToolUseFailure"][0]["hooks"][0]["command"]
     cursor = json.loads((path / ".cursor/hooks.json").read_text())
-    assert set(cursor["hooks"]) == {"afterShellExecution", "postToolUseFailure"} and cursor["version"] == 1
+    assert set(cursor["hooks"]) == {"postToolUse", "postToolUseFailure"} and cursor["version"] == 1
     copilot = json.loads((path / ".github/hooks/fbl-commands.json").read_text())
     assert set(copilot["hooks"]) == {"postToolUse", "postToolUseFailure"} and "powershell" in copilot["hooks"]["postToolUse"][0]
     status = subprocess.run(["git", "status", "--porcelain"], cwd=path, capture_output=True, text=True).stdout

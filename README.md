@@ -238,8 +238,8 @@ The note path does not depend on a particular agent: it is a command line call p
 | --- | --- | --- | --- | --- | --- |
 | Claude Code | `CLAUDE.md` (installer adds `@AGENTS.md`) | `fbl-friction` launcher | yes (`CLAUDECODE`, `CLAUDE_CODE_SESSION_ID`) | shell-command results from a `PostToolUse` hook | notes and command capture verified in a live `claude -p` session |
 | Codex CLI | `AGENTS.md` | launcher | yes (`CODEX_THREAD_ID`, `CODEX_SESSION_ID`, `CODEX_CI`) | token, cost and command failures from local session files with `--adapter codex` | real sessions in the original experiment |
-| Cursor | `AGENTS.md` and `.cursor/rules/friction-reporting.mdc` (always applied) | launcher | yes (`CURSOR_AGENT`, `CURSOR_CONVERSATION_ID`) | shell-command failures via `postToolUseFailure`; successes only if the payload carries an exit code | notes: real sessions in the original experiment. **Command hook written to the documented format, not yet run** |
-| GitHub Copilot (CLI, cloud agent; VS Code agent mode has no documented hooks) | `.github/copilot-instructions.md` (Copilot also reads `AGENTS.md` and `CLAUDE.md`) | launcher | no; set `FBL_HARNESS=copilot` to label it | `postToolUse` / `postToolUseFailure` hooks (CLI, cloud agent): success or failure, no exit code | **Not tested.** Hook config written to the documented format |
+| Cursor | `AGENTS.md` and `.cursor/rules/friction-reporting.mdc` (always applied) | launcher | yes (`CURSOR_AGENT`, `CURSOR_CONVERSATION_ID`) | shell-command results from `postToolUse` and `postToolUseFailure` hooks | notes: real sessions in the original experiment. Command capture verified in a live `cursor-agent` session |
+| GitHub Copilot CLI (VS Code agent mode has no documented hooks) | `.github/copilot-instructions.md` (Copilot also reads `AGENTS.md` and `CLAUDE.md`) | launcher | no; set `FBL_HARNESS=copilot` to label it | shell-command results from a `postToolUse` hook; the exit code is read from the result text | command capture verified in a live Copilot CLI session; instruction file not tested |
 | Cloud agents, experimental (Copilot coding agent, Codex cloud, Cursor background agents) | whichever file the product reads, same as above | commit trailers, no launcher | no (recorded as `unknown`) | none | trailer parsing is tested; `fbl-record.yml` ran on GitHub Actions in a private test repo, fed by an agent-style commit I made, not by a real Copilot or Codex cloud run |
 
 Detection only labels the record; a harness that is not detected is recorded as `unknown` and everything else still works.
@@ -250,9 +250,17 @@ Notes depend on the agent remembering to write one. Command capture adds an obje
 
 What is stored is deliberately small. Output is discarded before anything is written. The signature is the executable plus up to two plain lowercase words, stopping at the first flag, so `uv run pytest -x tests/secret_name.py` becomes `uv run pytest`. For anything that is not a recognised test, lint, build, migrate or install step, only the executable name is kept, so `mycli login hunter2` is stored as `mycli`. Commands in quotes are never split open. The hook is silent and always exits 0, so it cannot disturb the agent.
 
-Claude Code is verified in a live session: a failing `python3 -c 'import sys; sys.exit(2)'` produced a command event with exit code 2, and the commit's record listed it under failed commands next to the agent's note. Claude Code's real payload differs from its documentation: there is no `exit_code` field, and a failure arrives as `PostToolUseFailure` with `error: "Exit code N …"`. The parser reads that number and nothing else from the error text.
+Each integration was checked against a live session, and each one differed from its documentation or from what a reasonable guess would be:
 
-Cursor's shell hook documents no exit code, so only failures (from `postToolUseFailure`) are recorded unless the payload turns out to include one; the tool never records a success it cannot see. Copilot's hooks give success or failure only. The Cursor and Copilot configs follow the documented formats and have not been run yet.
+| Harness | Hooks used | What the live session showed |
+| --- | --- | --- |
+| Claude Code | `PostToolUse`, `PostToolUseFailure` (matcher `Bash`) | There is no `exit_code` field. A failure arrives as `PostToolUseFailure` with `error: "Exit code N …"`; the parser reads that number and nothing else from the text. |
+| Cursor | `postToolUse`, `postToolUseFailure` | `afterShellExecution` fires for successes and failures alike and carries no exit code, so it is not used. Failures give the code in `error_message` when Cursor words it that way, otherwise the command's output, in which case the code is recorded as 1. Duration arrives as a float. |
+| Copilot CLI | `postToolUse` | A failed command still arrives as `resultType: "success"`, and `postToolUseFailure` does not fire for it. The exit code is only in the text, `<shellId: 0 completed with exit code 1>`, so the parser reads that trailer at the end of the text and ignores the same words inside command output. |
+
+In all three, a failing `python3 -m pytest` and `false` were recorded with exit 1 and a passing command with 0, with the command's session id. The Copilot CLI runs a repository's hooks only in folders you have trusted: open the folder in `copilot` once and accept the prompt. Without that the hooks silently do nothing. The tool never records an outcome it cannot see (for example Cursor's `afterShellExecution`).
+
+Copilot's notes carry no session id, because Copilot sets no environment variable the tool recognises. They are linked to the commands of the same working session by time instead.
 
 ### Cloud agents and CI (experimental)
 
@@ -315,14 +323,14 @@ Windows differences: file locking uses `msvcrt` instead of `fcntl`; git runs wit
 - Cloud-hosted agents have no launcher or hooks. They rely on commit trailers and the `fbl-record.yml` workflow. That workflow has only been exercised with a simulated agent commit, not a real cloud agent.
 - Notes are self-reported. Treat them as leads unless a command failure or transcript signal agrees.
 - Five origins split a small sample thin; with few records most findings stay "Not established".
-- Copilot and Cursor command hooks follow the vendors' documented formats but have not run. Copilot's hooks report success or failure with no exit code, and VS Code agent mode has no documented hooks.
+- Command capture needs each tool's hook support: not available in Copilot's VS Code agent mode, and the Copilot CLI only runs repository hooks in trusted folders. Copilot's cloud agent runs only committed hooks, which this tool does not write.
 
 ## Roadmap
 
 Not in 0.1.0, roughly in the order I would do them.
 
 **Next, decided by the first pilot**
-- **Verify command capture in Cursor and Copilot.** The hook configs exist; run a failing command in each, check what the payloads really carry (Claude Code's did not match its documentation), and fix the parsers. Copilot's cloud agent only runs hooks that are committed to the repository, so it needs a committed variant with no machine-specific paths.
+- **Copilot cloud agent hooks.** The cloud agent runs only hooks committed to the repository, so it needs a variant with no machine-specific paths. Also the Copilot instruction file in VS Code agent mode, which is untested.
 - **Under-reporting measure.** Count sessions with failed verification and no note, so the report says how much friction goes unreported.
 - **Trend and outcome tracking.** The review already has a ledger of recommendations. Wire it up so a fixed doc shows whether its friction notes dropped afterwards.
 
