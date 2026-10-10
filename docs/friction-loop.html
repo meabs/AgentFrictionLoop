@@ -283,8 +283,8 @@ apm install &lt;owner&gt;/friction-loop --target claude</pre></div>
       <thead><tr><th>Platform</th><th>State</th></tr></thead>
       <tbody>
         <tr><td>macOS</td><td>All 117 tests pass. Install, note, commit and record were run end to end through <code>install.sh</code>.</td></tr>
-        <tr><td>Linux</td><td>Same code path as macOS. Not run separately.</td></tr>
-        <tr><td>Windows</td><td>Code written for it, not yet run on Windows. The repo carries a GitHub Actions matrix (Ubuntu, macOS, Windows) that runs the tests and an install smoke test; its first Windows run is the real check.</td></tr>
+        <tr><td>Linux</td><td>CI passes on Ubuntu: the test suite and an install smoke test.</td></tr>
+        <tr><td>Windows</td><td>CI passes on <code>windows-latest</code>: the same tests plus an install smoke test (install, file a note, commit, record appears). Getting there fixed several test-harness problems; the tool code itself needed no further change. Not tried on a developer's own Windows machine or with PowerShell agents.</td></tr>
       </tbody>
     </table></div>
     <div class="note">

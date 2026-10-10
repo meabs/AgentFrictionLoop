@@ -226,8 +226,8 @@ APM only copies files, so it cannot install hooks. After `apm install`, ask the 
 | Platform | State |
 | --- | --- |
 | macOS | All tests pass; install, note, commit and record verified end to end |
-| Linux | Tests pass in CI (Ubuntu) |
-| Windows | CI runs the tests and an install smoke test on `windows-latest`; see the Actions tab for the current result |
+| Linux | CI passes on Ubuntu (tests and install smoke test) |
+| Windows | CI passes on `windows-latest`: the test suite plus an install smoke test (install, file a note, commit, record appears). Not tried on a developer's own Windows machine or with PowerShell agents |
 
 Windows differences: file locking uses `msvcrt` instead of `fcntl`; git runs with an empty hooks directory instead of `/dev/null`; hook scripts get forward-slash paths and the Python interpreter recorded at install time; `fbl-friction.cmd` serves PowerShell and cmd.exe.
 
