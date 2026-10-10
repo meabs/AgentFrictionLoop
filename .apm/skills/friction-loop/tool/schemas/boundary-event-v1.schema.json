@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Boundary event v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "type", "event_id", "parent_event_id", "ts", "session", "harness", "shim_version"],
+  "properties": {
+    "schema_version": {"const": "boundary-event/v1"},
+    "type": {"enum": ["command", "friction"]},
+    "event_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "parent_event_id": {"type": ["string", "null"]},
+    "ts": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}Z$"},
+    "session": {"type": "object", "additionalProperties": false, "required": ["id", "source"], "properties": {"id": {"type": ["string", "null"]}, "source": {"enum": ["env", "none"]}}},
+    "harness": {"enum": ["codex", "cursor", "claude-code", "copilot", "unknown"]},
+    "shim_version": {"type": "string"},
+    "duration_ms": {"type": "integer", "minimum": 0},
+    "exit_code": {"type": "integer"},
+    "kind": {"enum": ["tests", "lint", "build", "migrate", "install", "git", "other"]},
+    "signature": {"type": "string", "maxLength": 60},
+    "cwd_rel": {"type": "string", "pattern": "^(|[^/].*)$"},
+    "category": {"enum": ["setup", "test-order", "missing-doc", "unclear-instruction", "environment", "tooling", "other"]},
+    "origin": {"enum": ["repository-discovery", "task-context", "execution-environment", "verification", "conflicting-knowledge"]},
+    "text": {"type": "string", "maxLength": 240, "pattern": "^[^\\x00-\\x1f\\x7f]*$"}
+  },
+  "allOf": [
+    {"if": {"properties": {"type": {"const": "command"}}}, "then": {"required": ["duration_ms", "exit_code", "kind", "signature", "cwd_rel"], "not": {"required": ["category", "text"]}}},
+    {"if": {"properties": {"type": {"const": "friction"}}}, "then": {"required": ["category", "text"], "not": {"required": ["duration_ms", "exit_code", "kind", "signature", "cwd_rel"]}}}
+  ]
+}

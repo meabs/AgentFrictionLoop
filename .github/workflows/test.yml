@@ -1,0 +1,24 @@
+name: test
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix: { os: [ubuntu-latest, macos-latest, windows-latest] }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pytest jsonschema
+      - run: git config --global user.email ci@example.com && git config --global user.name ci
+      - run: python -m pytest -q
+        working-directory: .apm/skills/friction-loop/tool
+      - name: Installer smoke test
+        shell: bash
+        run: |
+          mkdir proj && cd proj && git init -q && git commit -q --allow-empty -m init
+          python ../.apm/skills/friction-loop/install.py --repo . --domain ci --home "$RUNNER_TEMP/fbl"
+          ./.fbl/bin/fbl-friction --category missing-doc "ci smoke note"
+          echo x > a && git add a && git commit -q -m c && sleep 5
+          git log fbl-insights --oneline | grep -q record

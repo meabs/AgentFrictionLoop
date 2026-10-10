@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html{color-scheme:light}body{margin:0}</style>
+<title>Friction Loop</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column, a four-step flow, two install panels side by side (stacked on phones). */
+:root {
+  --bg: #f2f5f6; --surface: #ffffff; --fg: #15212b; --muted: #58697a; --line: #d3dce2;
+  --accent: #0b6e6a; --accent-fg: #ffffff; --warn-bg: #fdecc8; --warn-fg: #6b4300; --code-bg: #e8eef1;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f171d; --surface: #17222b; --fg: #e4ecf1; --muted: #93a5b4; --line: #2b3b47;
+  --accent: #4fc4bc; --accent-fg: #07201f; --warn-bg: #3d2d0c; --warn-fg: #f3d58f; --code-bg: #0b1217; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #0f171d; --surface: #17222b; --fg: #e4ecf1; --muted: #93a5b4; --line: #2b3b47;
+  --accent: #4fc4bc; --accent-fg: #07201f; --warn-bg: #3d2d0c; --warn-fg: #f3d58f; --code-bg: #0b1217; color-scheme: dark; }
+body { background: var(--bg); color: var(--fg); font: 400 16px/1.6 var(--font-body); }
+.page { max-width: 62rem; margin-inline: auto; padding-inline: 1rem; padding-block: 2rem 4rem; display: grid; gap: 3rem; }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(2.2rem, 6vw, 3.6rem); font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: 1.6rem; font-weight: 700; }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; max-width: 65ch; }
+.lede { font-size: 1.15rem; color: var(--muted); margin-top: 1rem; }
+.bar { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; justify-content: space-between; }
+.tag { font: 500 0.75rem var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+button { font: 500 0.9rem var(--font-body); border: 1px solid var(--line); background: var(--surface); color: var(--fg); padding: 0.5rem 0.9rem; border-radius: 6px; cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+code, pre { font-family: var(--font-mono); font-size: 0.85rem; }
+:not(pre) > code { background: var(--code-bg); padding: 0.1em 0.35em; border-radius: 4px; }
+.sec { display: grid; gap: 1rem; }
+.flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1rem; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; display: grid; gap: 0.5rem; align-content: start; min-width: 0; }
+.step .tag { color: var(--accent); }
+.step p { font-size: 0.92rem; color: var(--muted); }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 1rem; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 1rem; display: grid; gap: 0.75rem; min-width: 0; align-content: start; }
+.code { position: relative; background: var(--code-bg); border-radius: 6px; padding: 0.75rem; overflow-x: auto; }
+.code pre { margin: 0; white-space: pre; }
+.code button { position: absolute; top: 0.4rem; right: 0.4rem; padding: 0.2rem 0.5rem; font-size: 0.75rem; }
+.code pre { padding-right: 3.5rem; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { text-align: left; padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 0.75rem var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+.pill { display: inline-block; font: 500 0.78rem var(--font-mono); padding: 0.1rem 0.5rem; border-radius: 99px; background: var(--code-bg); }
+.note { background: var(--warn-bg); color: var(--warn-fg); border-radius: 8px; padding: 1rem; display: grid; gap: 0.5rem; }
+.note p { max-width: none; }
+ul { margin: 0; padding-left: 1.2rem; display: grid; gap: 0.35rem; max-width: 65ch; }
+footer { color: var(--muted); font-size: 0.85rem; }
+#status { font-size: 0.85rem; color: var(--muted); min-height: 1.2em; }
+</style>
+
+</head><body>
+<main class="page" id="doc">
+  <header>
+    <div class="bar">
+      <span class="tag">Agent feedback · v0.1.0</span>
+      <span class="bar" data-export-hide>
+        <span id="status" role="status" aria-live="polite"></span>
+        <button id="export" class="primary" type="button" hidden>Export as HTML</button>
+      </span>
+    </div>
+    <h1 style="margin-top:1rem">Friction Loop</h1>
+    <p class="lede">Coding agents leave a one-line note when a repository's docs slow them down. Git hooks file each note against the commit it belongs to. Once a week the notes are grouped, so a person can fix the doc gap that keeps costing agents time.</p>
+  </header>
+
+  <section class="sec" aria-labelledby="how">
+    <h2 id="how">How it works</h2>
+    <div class="flow">
+      <div class="step"><span class="tag">Note</span><h3>Agent reports a snag</h3><p>Before finishing, the agent runs <code>fbl-friction --origin conflicting-knowledge "…"</code>. Text is cut to 240 characters, control characters are removed, and anything that looks like a secret is dropped.</p></div>
+      <div class="step"><span class="tag">Record</span><h3>Commit becomes a record</h3><p>The <code>post-commit</code> hook runs in the background. It stores changed paths, line counts, which guidance files were touched and the session's notes as one JSON file on the hidden <code>fbl-insights</code> branch.</p></div>
+      <div class="step"><span class="tag">Sync</span><h3>Branch travels with the repo</h3><p>The <code>pre-push</code> hook fetches, rebases and pushes that branch. If you are offline, records stay committed locally and go out with the next push.</p></div>
+      <div class="step"><span class="tag">Review</span><h3>Weekly report, human fix</h3><p>A scheduled GitHub Action groups the records and opens an issue only when the same gap keeps recurring. Nothing edits your docs automatically.</p></div>
+    </div>
+    <p>Hooks never block a commit or a push. If the tool fails, it logs to <code>var/hook.log</code> and exits quietly.</p>
+  </section>
+
+  <section class="sec" aria-labelledby="cats">
+    <h2 id="cats">Where friction starts</h2>
+    <p>Each note carries an <strong>origin</strong>: where the problem started, which decides who can fix it. The agent answers one question, "where did the problem start?", and the report groups notes by origin and names the remedy.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Origin</th><th>Example</th><th>Remedy</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill">repository-discovery</span></td><td>The agent cannot find a contract that exists.</td><td>Improve navigation or indexing: link it from <code>AGENTS.md</code>.</td></tr>
+        <tr><td><span class="pill">task-context</span></td><td>The brief had no acceptance criterion.</td><td>Improve how tasks are briefed. Usually fixed in the issue or prompt template, outside the repo.</td></tr>
+        <tr><td><span class="pill">execution-environment</span></td><td>A migration had to run before the tests.</td><td>Fix the tooling, or document the prerequisite and its order as one runnable block.</td></tr>
+        <tr><td><span class="pill">verification</span></td><td>No fast way to tell whether the change works.</td><td>Improve tests or test infrastructure.</td></tr>
+        <tr><td><span class="pill">conflicting-knowledge</span></td><td>An old design doc contradicts the code.</td><td>Correct provenance or authority: update or remove the stale source and say which one wins.</td></tr>
+      </tbody>
+    </table></div>
+    <p><code>--category</code> still works, alone or together with <code>--origin</code>. When only <code>--origin</code> is given, the category is filled in for older readers (discovery → <code>missing-doc</code>, environment → <code>setup</code>, verification → <code>test-order</code>, conflicting → <code>unclear-instruction</code>, task-context → <code>other</code>). A note with an origin is grouped by it in the report; a note without one is grouped by its category, so existing records and <code>AGENTS.md</code> blocks keep working. Use <code>--category environment</code> alone for a machine fault no doc could prevent.</p>
+    <p>Task-context notes are reported as informational. The repository cannot fix them, so the report does not turn them into a docs recommendation. One note per root cause, three at most, and none when nothing went wrong.</p>
+  </section>
+
+  <section class="sec" aria-labelledby="install">
+    <h2 id="install">Install</h2>
+    <p>You need git and Python 3. On Windows, install Git for Windows, which supplies the <code>sh</code> that runs the hooks. The installer adds <code>jsonschema</code> with pip if it is missing.</p>
+    <div class="cols">
+      <div class="panel">
+        <h3>macOS and Linux</h3>
+        <div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>./install.sh --repo ~/code/my-project --domain my-team</pre></div>
+        <p>Then, in the project:</p>
+        <div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>./.fbl/bin/fbl-friction --origin execution-environment "tests fail until make db-migrate has run"</pre></div>
+      </div>
+      <div class="panel">
+        <h3>Windows (PowerShell)</h3>
+        <div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>.\install.ps1 --repo C:\code\my-project --domain my-team</pre></div>
+        <p>Then, in the project:</p>
+        <div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>.\.fbl\bin\fbl-friction.cmd --origin execution-environment "tests fail until make db-migrate has run"</pre></div>
+      </div>
+    </div>
+    <p>The installer copies the tool to <code>~/.local/share/fbl</code> (<code>%LOCALAPPDATA%\fbl</code> on Windows), creates the launcher, installs both hooks, creates the insights branch and appends the reporting block to <code>AGENTS.md</code> for you to review and commit. It refuses to overwrite hooks you already have. Add <code>--publish</code> to push the branch to the remote, so everyone on the team shares one actor salt.</p>
+    <table class="scroll" style="display:table">
+      <thead><tr><th>Option</th><th>Effect</th></tr></thead>
+      <tbody>
+        <tr><td><code>--repo</code></td><td>Project to instrument. Defaults to the current directory.</td></tr>
+        <tr><td><code>--domain</code></td><td>Team label stored with each record.</td></tr>
+        <tr><td><code>--adapter</code></td><td><code>boundary</code> (default), <code>codex</code> to also read local Codex sessions for token cost, or <code>none</code>.</td></tr>
+        <tr><td><code>--home</code></td><td>Where the tool is copied.</td></tr>
+        <tr><td><code>--publish</code></td><td>Push the insights branch to the remote.</td></tr>
+        <tr><td><code>--no-agents-md</code></td><td>Do not touch <code>AGENTS.md</code>.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+
+  <section class="sec" aria-labelledby="does">
+    <h2 id="does">What the installer does</h2>
+    <p>It changes three places: a shared tool folder, the project's <code>.git</code> directory, and <code>AGENTS.md</code>. Nothing is committed for you and nothing is pushed unless you pass <code>--publish</code>.</p>
+    <div class="scroll"><table>
+      <thead><tr><th>Step</th><th>What happens</th><th>Where</th></tr></thead>
+      <tbody>
+        <tr><td>1. Check</td><td>Confirms git and Python 3, finds the repository root, installs <code>jsonschema</code> with pip if it is missing.</td><td>nowhere</td></tr>
+        <tr><td>2. Copy the tool</td><td>Replaces the scripts, hooks, schemas and templates in the tool folder. Safe to re-run to upgrade.</td><td><code>~/.local/share/fbl</code> or <code>%LOCALAPPDATA%\fbl</code></td></tr>
+        <tr><td>3. Launcher</td><td>Writes <code>fbl-friction</code> (sh) and <code>fbl-friction.cmd</code> (PowerShell, cmd) that call the tool with the Python that ran the installer. Adds <code>.fbl/</code> to <code>.git/info/exclude</code>, so it is never committed.</td><td><code>&lt;project&gt;/.fbl/bin/</code></td></tr>
+        <tr><td>4. Insights branch</td><td>Creates the orphan branch <code>fbl-insights</code> as a linked worktree, or adopts the one already on the remote.</td><td><code>.git/fbl/insights</code></td></tr>
+        <tr><td>5. Hooks</td><td>Writes <code>post-commit</code> and <code>pre-push</code>. Each exports the tool path and Python path and runs the tool in the background. An existing hook with different content stops the install with an error.</td><td><code>.git/hooks/</code></td></tr>
+        <tr><td>6. Publish (optional)</td><td>With <code>--publish</code>, commits the shared actor salt and schema and pushes the branch.</td><td>the remote</td></tr>
+        <tr><td>7. AGENTS.md</td><td>Appends the friction block if there is no <code>## Friction reporting</code> heading yet. Left uncommitted for you to review.</td><td><code>AGENTS.md</code></td></tr>
+      </tbody>
+    </table></div>
+    <p>Hooks and the launcher live in <code>.git</code> and <code>.fbl</code>, which git does not share. <strong>Every clone needs its own install</strong>, including each teammate's.</p>
+  </section>
+
+  <section class="sec" aria-labelledby="samples">
+    <h2 id="samples">Sample output</h2>
+    <p>Everything below was captured from a real run on a scratch repository (long temp paths shortened).</p>
+
+    <h3>1. Installer</h3>
+<div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>$ ./install.sh --repo . --domain my-team
+tool installed at /Users/you/.local/share/fbl
+installed /code/my-project/.fbl/bin/fbl-friction
+insights worktree: /code/my-project/.git/fbl/insights
+installed post-commit hook
+installed pre-push hook
+added friction block to /code/my-project/AGENTS.md (review and commit it)
+done. Weekly review: copy .../templates/fbl-weekly.yml to .../.github/workflows and set FBL_TOOL_REPOSITORY / FBL_TOOL_REF.</pre></div>
+
+    <h3>2. An agent files a note</h3>
+<div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>$ ./.fbl/bin/fbl-friction --origin execution-environment "pytest failed until I ran make db-migrate"
+friction recorded: execution-environment / setup
+
+$ ./.fbl/bin/fbl-friction --origin task-context "password=hunter2"
+friction note dropped: looks like a secret</pre></div>
+    <p>Each note is one line in <code>.git/fbl/boundary/events.jsonl</code>. Read them with <code>python boundary.py events --repo .</code>:</p>
+<div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>{"category": "setup", "origin": "execution-environment", "harness": "claude-code", "session": {"id": "89a547fb-adf4-4fb0-ba4e-a072b8f837e2", "source": "env"},
+ "text": "pytest failed until I ran make db-migrate", "ts": "2026-10-09T22:38:05.965Z", "type": "friction", ...}</pre></div>
+    <p>The harness (Claude Code, Codex, Cursor) and session id come from the agent's environment variables. When neither is set, they are recorded as <code>unknown</code>.</p>
+
+    <h3>3. A commit becomes a record</h3>
+    <p>Within a second or two of <code>git commit</code> the branch gains one commit and one file:</p>
+<div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>$ git log fbl-insights --oneline
+868b205 record my-project@4c4e65e5cff5
+4563c76 Initialise fbl insights
+
+records/my-team/my-project/2026-10/4c4e65e5cff5.json</pre></div><div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>{
+  "actor": { "id": "03ff3f5e04ef", "kind": "human", "scheme": "hmac-sha256/v1" },
+  "agent": { "harness": "claude-code" },
+  "changed_files": [ { "path": "a", "status": "A" } ],
+  "diff_stats": { "files": 1, "insertions": 1, "deletions": 0, "by_category": { "source": 0, "tests": 0, "docs": 0, "guidance": 0, "config": 0, "other": 1 } },
+  "documentation": { "agents_md_present": false, "claude_md_present": false, "readme_present": false, ... },
+  "friction": [ { "category": "setup", "origin": "execution-environment", "source": "event", "text": "pytest failed until I ran make db-migrate" } ],
+  "guidance": { "digest": "e3b0c442...", "guidance_changed": false, "agents_md_referenced_paths": [], "skills_available": [] },
+  ...
+}</pre></div>
+    <p>No commit message, author name, email or file content appears. <code>actor.id</code> is the salted hash described under “What is stored”.</p>
+
+    <h3>4. Weekly report</h3>
+    <p><code>python weekly.py --insights .git/fbl/insights</code> writes a Markdown report and prints an <code>issue_body=</code> path only when the recommended set has changed. A report on a one-record repository:</p>
+<div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre># Agent Engineering Review
+
+## Summary
+Records analysed: 1.   Sessions: 1.   Distinct repositories: 1.
+Caveat: small sample: effects are directional.
+Caveat: single author: person effect cannot be separated from guidance effect.
+
+## Repeated friction
+Not established (below threshold):
+- F-001: Agents self-reported 'conflicting-knowledge' friction in 1 sessions. Scope: concentrated;
+  distinct actors: 1; actor share: 100%. Evidence: 1 records (my-project@54cacb36048a).
+- F-003: Informational (no recommendation without a linked failure): Agents self-reported
+  'task-context' friction in 1 sessions. Scope: concentrated; distinct actors: 1; ...</pre></div>
+    <p>A larger report from 17 real records, same format:</p>
+<div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>## Verification failures
+- F-001: First tests verification attempt failed in 10 sessions. Dominant failing command:
+  'uv run pytest'. Median attempts to reach a passing attempt: 2. Evidence: 10 records (...).
+- F-002: First lint verification attempt failed in 7 sessions. Dominant failing command: 'uv run ruff'.
+
+## Skills / AGENTS.md effectiveness
+- F-014: Informational: Skill 'add-ui-action' was available but loaded in 0 of 8 sessions in this epoch.
+- F-011: Informational: AGENTS.md reference 'deployment.md' was not opened in 16 sessions.</pre></div>
+    <p>Findings below the threshold (default: several records and more than one person) are labelled “Not established” so one agent's bad day does not become a recommendation.</p>
+  </section>
+
+  <section class="sec" aria-labelledby="agents">
+    <h2 id="agents">What to configure in AGENTS.md</h2>
+    <p>The file is <code>AGENTS.md</code> at the repository root. The installer adds the block below; this section covers what you still have to check.</p>
+<div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>## Friction reporting
+
+If something blocked or slowed you down, report it before finishing, even if you worked around it:
+
+./.fbl/bin/fbl-friction --origin &lt;origin> "&lt;what happened and what fixed it, one line, no secrets>"
+
+On Windows PowerShell or cmd.exe use `.\.fbl\bin\fbl-friction.cmd` instead.
+
+Pick the origin by asking "where did the problem start?":
+- repository-discovery: the contract, doc or entry point exists but you could not find it.
+- task-context: the task lacked an acceptance criterion, constraint or input you needed.
+- execution-environment: a prerequisite, migration, tool or service was missing or had to run in a certain order.
+- verification: you could not tell whether your change was correct (no fast test, flaky or missing fixtures).
+- conflicting-knowledge: two sources disagreed, or a doc contradicted the code. Say which one you trusted.
+
+For a machine fault no doc could prevent (disk full, no network, permissions) use `--category environment` instead of `--origin`.
+
+One note per root cause, at most 3 notes. Write nothing if nothing went wrong.</pre></div>
+    <div class="scroll"><table>
+      <thead><tr><th>Check</th><th>Why it matters</th></tr></thead>
+      <tbody>
+        <tr><td>Commit the block</td><td>The installer leaves <code>AGENTS.md</code> modified but uncommitted. Teammates' agents only see it once it is merged.</td></tr>
+        <tr><td>Keep the launcher path as written</td><td>Agents run <code>./.fbl/bin/fbl-friction</code> from the repository root. If a clone has not run the installer, the command is not found and the agent gets an error, so tell new contributors to run it.</td></tr>
+        <tr><td>Claude Code reads <code>CLAUDE.md</code>, not <code>AGENTS.md</code></td><td>Add a line <code>@AGENTS.md</code> to <code>CLAUDE.md</code> so the block reaches Claude Code. Codex and Cursor read <code>AGENTS.md</code> directly.</td></tr>
+        <tr><td>Keep the five origins</td><td>The report groups by them. An unknown <code>--origin</code> is rejected; giving neither <code>--origin</code> nor <code>--category</code> is an error. Blocks installed before origins existed keep working, with notes grouped by category.</td></tr>
+        <tr><td>Tell agents which source they trusted</td><td>A <code>conflicting-knowledge</code> note is only useful if it names both sources and the winner. Agents are poor at spotting a contradiction on their own, so expect fewer of these than the real number.</td></tr>
+        <tr><td>Reference your docs from AGENTS.md</td><td>The report compares the paths <code>AGENTS.md</code> links to against the files agents actually opened. A link that agents never open, or a doc they open that nothing links to, shows up as a finding.</td></tr>
+        <tr><td>Expect a new “epoch” when guidance changes</td><td>Edits to <code>AGENTS.md</code>, <code>CLAUDE.md</code>, <code>service.yaml</code> or anything under <code>.claude/skills/</code> or <code>.agents/skills/</code> change the guidance digest. Before/after comparisons use it, so installing this APM skill into <code>.claude/skills/</code> starts a new epoch.</td></tr>
+        <tr><td>No secrets in notes</td><td>Obvious secrets are dropped by a filter, but the filter is pattern-based. The block tells agents not to write any.</td></tr>
+      </tbody>
+    </table></div>
+    <h3>Outside AGENTS.md</h3>
+    <ul>
+      <li>For the weekly job, copy <code>templates/fbl-weekly.yml</code> to <code>.github/workflows/</code> and set the repository variables <code>FBL_TOOL_REPOSITORY</code> (where this tool is hosted) and <code>FBL_TOOL_REF</code> (a tag or branch).</li>
+      <li>Run <code>--publish</code> once per project, not per clone, so everyone shares one actor salt.</li>
+      <li>Optional: <code>--adapter codex</code> adds token and cost figures from local Codex session files.</li>
+    </ul>
+  </section>
+
+  <section class="sec" aria-labelledby="apm">
+    <h2 id="apm">As an APM package</h2>
+    <p>The folder is also an <a href="https://microsoft.github.io/apm/" style="color:var(--accent)">Agent Package Manager</a> package that ships one skill, <code>friction-loop</code>. The skill teaches agents when and how to file a note and bundles the installer.</p>
+    <div class="code"><button type="button" data-copy data-export-hide>Copy</button><pre>apm install ./friction-tool --target claude
+# or, once pushed to a git host:
+apm install &lt;owner&gt;/friction-loop --target claude</pre></div>
+    <p>APM only copies files, so it cannot install the hooks. After <code>apm install</code>, ask the agent to set the loop up, or run <code>python .claude/skills/friction-loop/install.py --repo .</code> yourself.</p>
+  </section>
+
+  <section class="sec" aria-labelledby="privacy">
+    <h2 id="privacy">What is stored</h2>
+    <ul>
+      <li>Changed file paths, line counts, a digest of the guidance files, and the friction notes.</li>
+      <li>A pseudonymous actor id: the first 12 hex characters of an HMAC of the lowercased author email, keyed with a salt stored on the insights branch. It lets the report count distinct people. It is not anonymous, because anyone holding the salt can test a guess.</li>
+      <li>Never prompts, transcripts, file contents, commit messages, author names or emails.</li>
+    </ul>
+  </section>
+
+  <section class="sec" aria-labelledby="status-h">
+    <h2 id="status-h">What has been verified</h2>
+    <div class="scroll"><table>
+      <thead><tr><th>Platform</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td>macOS</td><td>All 117 tests pass. Install, note, commit and record were run end to end through <code>install.sh</code>.</td></tr>
+        <tr><td>Linux</td><td>Same code path as macOS. Not run separately.</td></tr>
+        <tr><td>Windows</td><td>Code written for it, not yet run on Windows. The repo carries a GitHub Actions matrix (Ubuntu, macOS, Windows) that runs the tests and an install smoke test; its first Windows run is the real check.</td></tr>
+      </tbody>
+    </table></div>
+    <div class="note">
+      <h3>What Windows support changes</h3>
+      <p>File locking uses <code>msvcrt</code> instead of <code>fcntl</code>. Git commands run with an empty hooks directory instead of <code>/dev/null</code>. Hook scripts get forward-slash paths and the Python interpreter recorded at install time. Agents on PowerShell or cmd use the <code>fbl-friction.cmd</code> launcher; Git Bash uses the shell one.</p>
+    </div>
+    <p>Not yet run on GitHub: the weekly workflow and <code>gh issue create</code>. Cloud-hosted agents are out of reach, since the hooks only run on a developer's machine.</p>
+  </section>
+
+  <footer>Source: <code>friction-tool/</code>, extracted from <code>agent-feedback-loop</code>.</footer>
+</main>
+
+<script>
+(function () {
+  var status = document.getElementById("status");
+  function say(text) { status.textContent = text; setTimeout(function () { if (status.textContent === text) status.textContent = ""; }, 4000); }
+
+  document.querySelectorAll("[data-copy]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var text = btn.parentElement.querySelector("pre").textContent;
+      var done = function () { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy"; }, 1500); };
+      var fallback = function () {
+        var range = document.createRange(); range.selectNodeContents(btn.parentElement.querySelector("pre"));
+        var sel = getSelection(); sel.removeAllRanges(); sel.addRange(range); say("Press Ctrl+C or Cmd+C to copy");
+      };
+      try { navigator.clipboard.writeText(text).then(done, fallback); } catch (e) { fallback(); }
+    });
+  });
+
+  // Export: serialise this page into one self-contained HTML file. Controls are removed; the fonts link stays.
+  function buildExport() {
+    var clone = document.documentElement.cloneNode(true);
+    clone.querySelectorAll("[data-export-hide], script").forEach(function (n) { n.remove(); });
+    clone.removeAttribute("data-theme");
+    var head = clone.querySelector("head");
+    if (head && !head.querySelector("meta[charset]")) head.insertAdjacentHTML("afterbegin", '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">');
+    return "<!doctype html>\n" + clone.outerHTML;
+  }
+
+  var exportBtn = document.getElementById("export");
+  var downloads = null;
+  (window.claude && window.claude.use ? window.claude.use("downloads") : Promise.resolve(null)).then(function (d) {
+    if (!d) return;
+    downloads = d; exportBtn.hidden = false;
+  }, function () {});
+  exportBtn.addEventListener("click", function () {
+    if (!downloads) return;
+    downloads.save({ filename: "friction-loop.html", data: new Blob([buildExport()], { type: "text/html" }) }).then(
+      function () { say("Saved friction-loop.html"); },
+      function (err) { say(err && err.code === "declined" ? "Export cancelled" : "Export is not available here"); }
+    );
+  });
+})();
+</script>
+</body></html>

@@ -1,0 +1,18 @@
+#!/bin/sh
+# Deliberately asynchronous: feedback must never block a commit.
+set -u
+tool_dir=${FBL_HOME:-"$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"}
+insights=${FBL_INSIGHTS:-}
+domain=${FBL_DOMAIN:-default}
+adapter=${FBL_ADAPTER:-none}
+repo=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+[ "$(git symbolic-ref --short HEAD 2>/dev/null)" = "fbl-insights" ] && exit 0
+mkdir -p "$tool_dir/var" 2>/dev/null || exit 0
+if [ -z "$insights" ]; then
+  printf '%s\n' '{"event":"hook_skipped","reason":"FBL_INSIGHTS is unset"}' >>"$tool_dir/var/hook.log" 2>/dev/null || true
+  exit 0
+fi
+nohup "${FBL_PYTHON:-python3}" "$tool_dir/analyse-change.py" --repo "$repo" --commit HEAD \
+  --insights "$insights" --domain "$domain" --adapter "$adapter" --fail-open \
+  >>"$tool_dir/var/hook.log" 2>&1 </dev/null &
+exit 0

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Deliberately asynchronous: syncing insights must never block or fail a push.
+set -u
+tool_dir=${FBL_HOME:-"$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"}
+repo=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+mkdir -p "$tool_dir/var" 2>/dev/null || exit 0
+nohup "${FBL_PYTHON:-python3}" "$tool_dir/insights_sync.py" push --repo "$repo" --remote "${1:-origin}" \
+  >>"$tool_dir/var/hook.log" 2>&1 </dev/null &
+exit 0

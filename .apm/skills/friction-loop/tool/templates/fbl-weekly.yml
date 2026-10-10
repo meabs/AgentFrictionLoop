@@ -1,0 +1,33 @@
+# Copy to .github/workflows/fbl-weekly.yml in the project repository.
+# First run on GitHub found that unquoted ${{ }} inside a flow mapping is invalid YAML; the checkout inputs are now block style.
+name: Weekly agent feedback review
+on:
+  schedule: [{ cron: "0 6 * * 1" }]
+  workflow_dispatch:
+permissions:
+  contents: write
+  issues: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: fbl-insights, path: insights, fetch-depth: 0 }
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.FBL_TOOL_REPOSITORY }}
+          ref: ${{ vars.FBL_TOOL_REF }}
+          path: tool
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install jsonschema
+      - id: review
+        working-directory: tool
+        run: |
+          git -C ../insights config user.name "fbl-review"
+          git -C ../insights config user.email "fbl-review@users.noreply.github.com"
+          python weekly.py --insights ../insights --push | tee out.txt
+          echo "issue_body=$(sed -n 's/^issue_body=//p' out.txt)" >> "$GITHUB_OUTPUT"
+      - if: steps.review.outputs.issue_body != ''
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: gh issue create --repo "$GITHUB_REPOSITORY" --title "Agent feedback review $(date +%F)" --body-file "${{ steps.review.outputs.issue_body }}"

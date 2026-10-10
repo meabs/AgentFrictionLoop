@@ -1,0 +1,4 @@
+name: friction-loop
+version: 0.1.0
+description: Agent friction-note loop - agents report doc gaps, git hooks record them, a weekly report surfaces recurring ones
+author: garry
