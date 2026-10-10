@@ -182,7 +182,7 @@ def test_installed_hook_is_async_and_never_dirties_committed_repo(tmp_path: Path
     hook = repo / ".git/hooks/post-commit"
     text = hook.read_text(encoding="utf-8")
     assert f"FBL_HOME='{ROOT.as_posix()}'" in text
-    assert f"FBL_INSIGHTS='{insights}'" in text
+    assert f"FBL_INSIGHTS='{Path(insights).as_posix()}'" in text
     before = run("git", "status", "--porcelain", cwd=repo).stdout
     (repo / "app.py").write_text("changed\n", encoding="utf-8")
     started = time.monotonic()
