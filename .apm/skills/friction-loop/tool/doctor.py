@@ -190,7 +190,8 @@ def check(repo: Path, run: bool, command: str | None, timeout: int) -> list[dict
                     add("not-run", f"could not clone to a clean directory: {out.strip()[:200]}")
                 else:
                     env = {k: v for k, v in os.environ.items() if k in ("PATH", "HOME", "LANG", "TMPDIR", "SHELL", "USER")}
-                    code, out = sh(["bash", "-lc", cmd], clone, timeout, env)
+                    shell = ["bash", "-lc"] if os.name != "nt" else [shutil.which("sh") or "sh", "-c"]  # on Windows `bash` may be WSL's stub; Git for Windows provides sh
+                    code, out = sh([*shell, cmd], clone, timeout, env)
                     tail = [ln for ln in out.splitlines() if ln.strip()][-12:]
                     if code == 0:
                         findings.append({"kind": "ran", "message": f"`{cmd}` passed in a clean clone", "where": "", "fix": ""})

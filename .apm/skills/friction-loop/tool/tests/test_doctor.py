@@ -50,7 +50,7 @@ def test_a_documented_project_is_clean(tmp_path: Path):
 
 def test_run_names_the_cause_of_a_failure_in_a_clean_clone(tmp_path: Path):
     repo = project(tmp_path, {"AGENTS.md": "```sh\npytest\n```\n", "t.sh": "echo \"RuntimeError: Frontend directory '/x/frontend' does not exist\" >&2; exit 4\n"})
-    f = [x for x in doctor.check(repo, True, "bash t.sh", 30) if x["kind"] == "run-failed"]
+    f = [x for x in doctor.check(repo, True, "sh t.sh", 30) if x["kind"] == "run-failed"]
     assert f and "generated directory is missing" in f[0]["message"] and "exit 4" in f[0]["message"]
     ok = doctor.check(repo, True, "true", 30)
     assert any(x["kind"] == "ran" for x in ok)
