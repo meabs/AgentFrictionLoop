@@ -1,6 +1,6 @@
 # Agent Friction Loop
 
-**Version 0.2.0.** Find out where your repository gets in the way of coding agents, and fix the docs that cause it.
+**Version 0.3.0.** Find out where your repository gets in the way of coding agents, and fix the docs that cause it.
 
 Agents (Claude Code, Codex, Cursor, GitHub Copilot) lose time to the same few things: a migration nobody wrote down, a design doc that contradicts the code, a contract they cannot find. This tool makes those moments visible. The agent files a one-line note when something slows it down, a git hook attaches the note to the commit, and a weekly report groups the notes so a person can fix the doc gap that keeps costing time. Nothing edits your repository automatically.
 
@@ -336,7 +336,7 @@ Copilot's notes carry no session id, because Copilot sets no environment variabl
 
 ### Cloud agents and CI (experimental)
 
-This path is experimental and not part of what 0.2.0 promises. Agents that run on a remote machine have no hooks and no `.fbl/` launcher, because both live in your local `.git`. The block tells them to add `Friction[<origin>]: text` trailers to their commit messages instead:
+This path is experimental and not part of what 0.3.0 promises. Agents that run on a remote machine have no hooks and no `.fbl/` launcher, because both live in your local `.git`. The block tells them to add `Friction[<origin>]: text` trailers to their commit messages instead:
 
 ```
 Fix payment retry
@@ -400,7 +400,7 @@ Windows differences: file locking uses `msvcrt` instead of `fcntl`; git runs wit
 
 ## Roadmap
 
-Not in 0.2.0, roughly in the order I would do them.
+Not in 0.3.0, roughly in the order I would do them.
 
 **Next, decided by the first pilot**
 - **Copilot cloud agent hooks.** The cloud agent runs only hooks committed to the repository, so it needs a variant with no machine-specific paths. Also the Copilot instruction file in VS Code agent mode, which is untested.
