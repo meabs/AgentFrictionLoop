@@ -15,7 +15,7 @@ Pick the origin by asking "where did the problem start?":
 - repository-discovery: the contract, doc or entry point exists but you could not find it.
 - task-context: the task lacked an acceptance criterion, constraint or input you needed.
 - execution-environment: a prerequisite, migration, tool or service was missing or had to run in a certain order.
-- verification: you could not tell whether your change was correct (no fast test, flaky or missing fixtures).
+- verification: you could not run, or did not trust, the checks for your change (no documented test command, tests that need a prerequisite, flaky or missing fixtures, a suite too slow to run). Name the command that failed or was missing, even if you finished the task.
 - conflicting-knowledge: two sources disagreed, or a doc contradicted the code. Say which one you trusted.
 
 If `./.fbl/bin/fbl-friction` does not exist (cloud agents and CI have no launcher), add trailer lines to your commit message instead, one per note:

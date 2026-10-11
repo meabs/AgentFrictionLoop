@@ -82,6 +82,7 @@ Each note has an **origin**: where the problem started, which decides who can fi
 .\.fbl\bin\fbl-friction.cmd --origin <origin> "<...>"      # PowerShell / cmd.exe
 ```
 
+- A real example of the `verification` origin, from a Codex run on a FastAPI change task: `--origin verification "pytest tests/api/routes/test_items.py could not collect because generated backend/app/frontend directory is missing; static checks were run instead"`. In a six-run trial with [AgentTrialRig](https://github.com/meabs/AgentTrialRig), every agent given these instructions filed a note naming that blocker, while the agents without them reported failure and left nothing that said why.
 - The older `--category` (`test-order`, `missing-doc`, `unclear-instruction`, `setup`, `environment`, `tooling`, `other`) still works, alone or together with `--origin`. With only `--origin`, the category is filled in for older readers.
 - A note with an origin is grouped by it in the report; a note without one is grouped by its category. Existing records and `AGENTS.md` blocks keep working.
 - Use `--category environment` alone for a machine fault no doc could prevent (disk full, no network).
@@ -189,7 +190,7 @@ Pick the origin by asking "where did the problem start?":
 - repository-discovery: the contract, doc or entry point exists but you could not find it.
 - task-context: the task lacked an acceptance criterion, constraint or input you needed.
 - execution-environment: a prerequisite, migration, tool or service was missing or had to run in a certain order.
-- verification: you could not tell whether your change was correct (no fast test, flaky or missing fixtures).
+- verification: you could not run, or did not trust, the checks for your change (no documented test command, tests that need a prerequisite, flaky or missing fixtures, a suite too slow to run). Name the command that failed or was missing, even if you finished the task.
 - conflicting-knowledge: two sources disagreed, or a doc contradicted the code. Say which one you trusted.
 
 If `./.fbl/bin/fbl-friction` does not exist (cloud agents and CI have no launcher), add trailer lines to your commit message instead, one per note:
