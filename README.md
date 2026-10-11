@@ -231,6 +231,8 @@ bash scripts/test.sh "$@"
    looks like: a permission problem; usual fix: check file modes and the user the tests run as
 ```
 
+**Tried on other projects.** Run on eight public repositories (Click, Flask, Express, Spring Petclinic, the NestJS TypeScript starter, a Django starter, the RealWorld Express app, and the upstream FastAPI template), the first version flagged Petclinic's optional `docker-compose.yml` as a needed database and Django's `manage.py` as needing a migration before tests; both were wrong (Petclinic's tests use an in-memory database, and Django's test runner builds its own), so a compose file alone no longer counts and Django is not asked to migrate. It also found no test command for the Django project, which now falls back to `python manage.py test`. On the other six it reports only that no agent instruction file names the test command, which is true but weak. The generated-directory and migration findings appeared only on the FastAPI template, where agents did hit them. The script it drafted for that template was run for real against a fresh database, and the first version would have failed (`coverage: command not found`, because the project's tools live in the `uv` environment); it now prefixes `uv run` when a `uv.lock` exists, and the drafted script then migrated and passed all 58 tests.
+
 Limits: the checks are pattern-based and can be wrong, so each finding names the file or line to look at. `--run` runs your test command on your machine, in a clone, with real network and disk access. Triage groups by wording, so two notes about one cause can land in different groups.
 
 ## Repeated friction

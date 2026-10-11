@@ -87,3 +87,17 @@ def test_launcher_is_installed_next_to_the_friction_one(tmp_path: Path):
     import boundary
     boundary.main(["install", "--repo", str(repo)])
     assert (repo / ".fbl" / "bin" / "fbl-doctor").read_text(encoding="utf-8").count("doctor.py") == 1
+
+
+def test_docker_compose_alone_and_django_migrate_are_not_flagged(tmp_path: Path):
+    files = {"docker-compose.yml": "services:\n  db:\n    image: postgres\n", "manage.py": "", "app/tests.py": ""}
+    repo = project(tmp_path, files)
+    found = {f["kind"] for f in doctor.check(repo, False, None, 10)}
+    assert "database" not in found and "migrations" not in found  # Django's own test runner builds the test database
+    assert doctor.test_candidates(repo, doctor.tracked(repo), doctor.docs_text(repo))[0][0] == "python manage.py test"
+
+
+def test_suggest_puts_project_tools_on_path_when_a_lockfile_exists(tmp_path: Path):
+    files = dict(APP, **{"AGENTS.md": "# Tests\n```sh\nbash backend/scripts/test.sh\n```\n", "backend/uv.lock": ""})
+    script, notes = doctor.build_script(project(tmp_path, files))
+    assert "uv run bash scripts/test.sh" in script and any("uv.lock" in n for n in notes)
