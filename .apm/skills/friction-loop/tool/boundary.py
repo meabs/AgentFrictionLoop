@@ -41,6 +41,13 @@ def install(args: argparse.Namespace) -> int:
     if not cmd.exists():
         with cmd.open("w", encoding="utf-8", newline="\r\n") as stream:
             stream.write(f'@echo off\r\n"{Path(sys.executable)}" "{Path(__file__).resolve()}" friction %*\r\n')
+    doctor = bindir / "fbl-doctor"
+    if not doctor.exists():
+        with doctor.open("w", encoding="utf-8", newline="\n") as stream:
+            stream.write(f'#!/bin/sh\nexec "{python}" "{Path(__file__).resolve().with_name("doctor.py").as_posix()}" "$@"\n')
+        doctor.chmod(0o755)
+        with (bindir / "fbl-doctor.cmd").open("w", encoding="utf-8", newline="\r\n") as stream:
+            stream.write(f'@echo off\r\n"{Path(sys.executable)}" "{Path(__file__).resolve().with_name("doctor.py")}" %*\r\n')
     exclude = _common(repo) / "info" / "exclude"
     exclude.parent.mkdir(parents=True, exist_ok=True)
     current = exclude.read_text(encoding="utf-8") if exclude.exists() else ""

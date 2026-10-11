@@ -21,7 +21,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 TOOL = HERE / "tool"
-ITEMS = ["boundary.py", "insights_sync.py", "analyse-change.py", "review.py", "weekly.py", "feedback_loop", "hooks", "schemas", "templates", "docs"]
+ITEMS = ["boundary.py", "doctor.py", "insights_sync.py", "analyse-change.py", "review.py", "weekly.py", "feedback_loop", "hooks", "schemas", "templates", "docs"]
 
 
 def default_home() -> Path:

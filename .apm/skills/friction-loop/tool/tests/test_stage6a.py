@@ -69,7 +69,7 @@ def test_install_is_idempotent_and_creates_only_the_launcher(tmp_path: Path):
     before = (path / ".fbl/bin/fbl-friction").read_text()
     install(path)
     assert (path / ".fbl/bin/fbl-friction").read_text() == before
-    assert sorted(p.name for p in (path / ".fbl/bin").iterdir()) == ["fbl-friction", "fbl-friction.cmd"]
+    assert sorted(p.name for p in (path / ".fbl/bin").iterdir()) == ["fbl-doctor", "fbl-doctor.cmd", "fbl-friction", "fbl-friction.cmd"]
     assert (path / ".git/info/exclude").read_text().splitlines().count(".fbl/") == 1
 
 

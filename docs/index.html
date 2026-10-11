@@ -219,6 +219,38 @@ Not established (below threshold):
     <p>Findings below the threshold (default: several records and more than one person) are labelled “Not established” so one agent's bad day does not become a recommendation.</p>
   </section>
 
+  <section class="sec" aria-labelledby="doctor">
+    <h2 id="doctor">fbl-doctor: find the gaps first</h2>
+    <p>Notes report what agents tripped on after the fact. <code>fbl-doctor</code> checks a fresh checkout for the same problems up front, drafts a single test script from the documented steps, and groups the notes agents filed so the recurring ones come first. It makes no model calls. Real output on the FastAPI project from the benchmark:</p>
+    <div class="code"><pre>[warn] the test command (`bash backend/scripts/test.sh`, from backend/scripts/test.sh) is not in AGENTS.md or CLAUDE.md
+       at   no agent instruction file
+       fix  add it, with its prerequisites
+[warn] the project uses a database but the agent instructions do not say how to get one
+       at   .env
+       fix  document how to start it and which URL the tests use
+[warn] backend/alembic.ini is present but the agent instructions never mention migrating; a new database has no tables
+       at   backend/alembic.ini
+       fix  run `cd backend &amp;&amp; alembic upgrade head` before the tests, in the same script
+[warn] backend/app/main.py:11 refers to `frontend`, which is git-ignored and absent from a fresh checkout
+       at   backend/app/main.py:11
+       fix  say which build step creates it, or have the code skip the check when it is absent
+4 things an agent could trip on</pre></div>
+    <p>And the notes from the benchmark's FastAPI runs, grouped:</p>
+    <div class="code"><pre>26 notes in 12 groups; most-hit first
+
+1. 5 sessions, 7 notes [execution-environment; codex]
+   Backend pytest initially failed because the configured PostgreSQL database had no tables; ran the documented backend prestart migration setup.
+   looks like: the database has no tables; usual fix: run the migrations before the tests, in the same command
+2. 3 sessions, 3 notes [verification; codex]
+   Full Playwright suite had 2 reset-password failures because Mailpit was not running at localhost:8025; archive UI test passed.
+3. 2 sessions, 4 notes [execution-environment; codex]
+   Backend pytest initially could not import because backend/app/frontend was absent; used a temporary empty directory and removed it after each run.
+4. 2 sessions, 2 notes [execution-environment; codex]
+   scripts/generate-client.sh was not executable; ran it with bash instead
+   looks like: a permission problem; usual fix: check file modes and the user the tests run as</pre></div>
+    <p>An arm of that benchmark that replaced the prose with one <code>scripts/test.sh</code> filed no notes and needed 7.7 turns on average against 15.3, in three runs per arm: a pointer to the mechanism, not a rate. Findings are pattern-based leads, each naming the file or line behind it.</p>
+  </section>
+
   <section class="sec" aria-labelledby="agents">
     <h2 id="agents">What to configure in AGENTS.md</h2>
     <p>The file is <code>AGENTS.md</code> at the repository root. The installer adds the block below to <code>AGENTS.md</code> and the other instruction files; this section covers what you still have to check.</p>
